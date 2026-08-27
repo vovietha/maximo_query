@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAXIMO SQL QUERY CONSOLE</title>
+    
+    <!-- CodeMirror CSS & Theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css">
+
+    <!-- CodeMirror Core & SQL Mode -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/sql/sql.min.js"></script>
+    
+    <!-- Autocomplete Addons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/sql-hint.min.js"></script>
+    
+    <!-- SheetJS xuất Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #1e1e1e; color: #d4d4d4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 12px; }
+        
+        /* Top Navigation Header */
+        .navbar { display: flex; justify-content: space-between; align-items: center; background-color: #181818; padding: 10px 15px; border-bottom: 1px solid #333; border-radius: 6px; margin-bottom: 12px; }
+        .navbar h1 { color: #61dafb; margin: 0; font-size: 18px; font-weight: bold; }
+        .btn-config { background: #333; color: #fff; border: 1px solid #555; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .btn-config:hover { background: #444; }
+
+        /* Main Console Layout */
+        .container { display: flex; height: calc(100vh - 80px); gap: 12px; }
+        .main-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+        .sidebar { width: 300px; background: #252526; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; border: 1px solid #3c3c3c; }
+        
+        /* Editor Container cho phép kéo giãn chiều cao */
+        .editor-container { 
+            height: 220px; 
+            min-height: 100px; 
+            max-height: 70vh; 
+            resize: vertical; 
+            overflow: hidden; 
+            border: 1px solid #3c3c3c; 
+            border-radius: 4px; 
+            position: relative; 
+        }
+        .CodeMirror { height: 100% !important; font-size: 14px; font-family: 'Consolas', 'Courier New', monospace; }
+
+        /* Custom Popup Gợi Ý CodeMirror Autocomplete */
+        .CodeMirror-hints {
+            background: #252526 !important;
+            border: 1px solid #454545 !important;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+            z-index: 9999 !important;
+        }
+        .CodeMirror-hint { color: #9cdcfe !important; }
+        li.CodeMirror-hint-active { background: #04395e !important; color: #ffffff !important; }
+
+        /* Toolbar Action Buttons & Filter */
+        .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .action-btns { display: flex; gap: 8px; align-items: center; }
+        .pagination-container { display: flex; gap: 6px; align-items: center; }
+        
+        .btn { padding: 8px 14px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-run { background-color: #0e639c; color: white; }
+        .btn-run:hover:not(:disabled) { background-color: #1177bb; }
+        .btn-toggle { background-color: #d7ba7d; color: #1e1e1e; }
+        .btn-excel { background-color: #278040; color: white; }
+        .btn-nav { background: #333; color: #61dafb; border: 1px solid #444; }
+        .btn-nav:hover:not(:disabled) { background: #444; }
+
+        .filter-input {
+            padding: 7px 12px;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            color: #4ec9b0;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 200px;
+            outline: none;
+        }
+        .filter-input:focus { border-color: #007acc; }
+
+        /* Message Box */
+        .msg-box { padding: 10px; border-radius: 4px; font-size: 13px; display: none; word-break: break-all; font-family: monospace; }
+        .msg-box.error { background-color: #5a1d1d; color: #f88080; border: 1px solid #802020; display: block; }
+        .msg-box.success { background-color: #1e4620; color: #80f880; border: 1px solid #208020; display: block; }
+
+        /* Results Container & Table Fix */
+        .results-container { 
+            flex: 1; 
+            background: #252526; 
+            border: 1px solid #3c3c3c; 
+            border-radius: 4px; 
+            overflow: auto; 
+            padding: 0; 
+        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+        th, td { border-bottom: 1px solid #3c3c3c; border-right: 1px solid #3c3c3c; padding: 8px 10px; text-align: left; }
+        th { background-color: #181818; color: #4ec9b0; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        tr:nth-child(even) { background-color: #2a2d2e; }
+        .stt-col { text-align: center; font-weight: bold; color: #61dafb; width: 50px; }
+
+        /* History Panel */
+        .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+        .history-item { background: #1e1e1e; padding: 8px; border-radius: 4px; border: 1px solid #333; cursor: pointer; font-size: 11px; font-family: Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .history-item:hover { border-color: #61dafb; color: #fff; background: #2d2d2d; }
+
+        /* Modal Overlay */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #252526; padding: 20px; border-radius: 8px; width: 420px; border: 1px solid #3c3c3c; color: #ccc; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #3c3c3c; padding-bottom: 10px; }
+        .modal-header h3 { margin: 0; color: #61dafb; font-size: 16px; }
+        .close-btn { cursor: pointer; font-size: 20px; color: #aaa; }
+        .close-btn:hover { color: #fff; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 12px; color: #aaa; }
+        .form-group input { width: 100%; padding: 8px; background: #1e1e1e; border: 1px solid #3c3c3c; color: #fff; border-radius: 4px; font-family: 'Segoe UI', sans-serif; }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navbar -->
+    <div class="navbar">
+        <h1>MAXIMO SQL QUERY CONSOLE</h1>
+        <button class="btn-config" onclick="openConfigModal()">⚙️ Cấu hình kết nối</button>
+    </div>
+
+    <!-- Main App UI -->
+    <div class="container">
+        <div class="main-panel">
+            <div class="editor-container">
+                <textarea id="sqlEditor"></textarea>
+            </div>
+
+            <div class="toolbar">
+                <div class="action-btns">
+                    <button class="btn btn-run" onclick="runQuery(1)">Chạy Query (Ctrl+Enter)</button>
+                    <button class="btn btn-toggle" onclick="toggleView()">Đổi View (Table/JSON)</button>
+                    <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Lọc kết quả real-time..." oninput="renderResults()" />
+                </div>
+                
+                <!-- Thanh Phân Trang & Xuất Excel -->
+                <div class="pagination-container">
+                    <button class="btn btn-nav" id="btnPrev" onclick="changePage(-1)" disabled>◄ Trước</button>
+                    <span id="pageLabel" style="font-size: 12px; color: #4ec9b0; font-weight: bold; min-width: 60px; text-align: center;">Trang 1</span>
+                    <button class="btn btn-nav" id="btnNext" onclick="changePage(1)" disabled>Sau ►</button>
+                    <button class="btn btn-excel" onclick="exportExcel()">Xuất Excel (.xlsx)</button>
+                </div>
+            </div>
+
+            <div id="msgBox" class="msg-box"></div>
+
+            <div id="resultsContainer" class="results-container">
+                <div style="color: #666; text-align: center; margin-top: 50px;">Nhập câu lệnh SQL và bấm "Chạy Query" để xem kết quả</div>
+            </div>
+        </div>
+
+        <!-- Sidebar Lịch sử Query -->
+        <div class="sidebar">
+            <h3 style="margin: 0; font-size: 14px; color: #61dafb;">Lịch sử Query</h3>
+            <div id="historyList" class="history-list"></div>
+        </div>
+    </div>
+
+    <!-- Popup Modal Cấu hình -->
+    <div id="configModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Cấu hình kết nối Maximo</h3>
+                <span class="close-btn" onclick="closeConfigModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>Maximo Host (bao gồm Port):</label>
+                <input type="text" id="cfgHost" placeholder="VD: http://cmms.pvpgb.vn:9080" />
+            </div>
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" id="cfgUser" placeholder="VD: maxadmin" />
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="cfgPass" placeholder="Nhập password" />
+            </div>
+            <button class="btn btn-run" style="width: 100%; margin-top: 10px;" onclick="saveConfig()">Lưu cấu hình</button>
+        </div>
+    </div>
+
+    <script>
+        let editor, currentData = [], viewMode = 'TABLE', history = [], filteredData = [];
+        let currentPage = 1, hasMore = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            editor = CodeMirror.fromTextArea(document.getElementById('sqlEditor'), {
+                mode: 'text/x-sql',
+                theme: 'dracula',
+                lineNumbers: true,
+                indentWithTabs: true,
+                smartIndent: true,
+                lineWrapping: true,
+                extraKeys: {
+                    "Ctrl-Enter": function() { runQuery(1); },
+                    "Ctrl-Space": "autocomplete"
+                },
+                hintOptions: {
+                    tables: {
+                        workorder: ["wonum", "description", "status", "siteid", "assetnum", "location"],
+                        asset: ["assetnum", "description", "siteid", "status", "location"],
+                        locations: ["location", "description", "siteid", "type"],
+                        inventory: ["itemnum", "location", "siteid", "issueunit"],
+                        invtrans: ["itemnum", "storeloc", "siteid", "transdate", "quantity", "transtype", "curbal"],
+                        matrectrans: ["itemnum", "tostoreloc", "fromstoreloc", "siteid", "transdate", "quantity", "issuetype"],
+                        matusetrans: ["itemnum", "storeloc", "siteid", "transdate", "quantity", "issuetype"]
+                    }
+                }
+            });
+
+            editor.on("inputRead", function(cm, change) {
+                if (change.text[0].match(/^[\w.]$/)) {
+                    CodeMirror.commands.autocomplete(cm, null, { completeSingle: false });
+                }
+            });
+
+            const resizer = new ResizeObserver(() => {
+                if (editor) editor.refresh();
+            });
+            resizer.observe(document.querySelector('.editor-container'));
+
+            editor.setValue("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
+            loadHistory();
+        });
+
+        // Modal Controls
+        function openConfigModal() {
+            document.getElementById('cfgHost').value = localStorage.getItem('maximo_host') || '';
+            document.getElementById('cfgUser').value = localStorage.getItem('maximo_user') || '';
+            document.getElementById('cfgPass').value = localStorage.getItem('maximo_pass') || '';
+            document.getElementById('configModal').style.display = 'flex';
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+
+        function saveConfig() {
+            const host = document.getElementById('cfgHost').value.trim();
+            const user = document.getElementById('cfgUser').value.trim();
+            const pass = document.getElementById('cfgPass').value.trim();
+
+            if (!host || !user || !pass) {
+                alert('Vui lòng nhập đầy đủ thông tin Host, Username và Password!');
+                return;
+            }
+
+            localStorage.setItem('maximo_host', host);
+            localStorage.setItem('maximo_user', user);
+            localStorage.setItem('maximo_pass', pass);
+            alert('Đã lưu cấu hình kết nối thành công!');
+            closeConfigModal();
+        }
+
+        // Chuyển trang
+        function changePage(delta) {
+            const targetPage = currentPage + delta;
+            if (targetPage >= 1) {
+                runQuery(targetPage);
+            }
+        }
+
+        // Cập nhật trạng thái nút chuyển trang
+        function updatePaginationButtons() {
+            document.getElementById('pageLabel').innerText = `Trang ${currentPage}`;
+            document.getElementById('btnPrev').disabled = (currentPage <= 1);
+            document.getElementById('btnNext').disabled = !hasMore;
+        }
+
+        // Thực thi Query với tham số trang
+        async function runQuery(page = 1) {
+            currentPage = page;
+            const sql = editor.getValue().trim();
+            const msgBox = document.getElementById('msgBox');
+            const resContainer = document.getElementById('resultsContainer');
+
+            msgBox.className = 'msg-box';
+            msgBox.style.display = 'none';
+            document.getElementById('filterInput').value = '';
+
+            const host = localStorage.getItem('maximo_host');
+            const user = localStorage.getItem('maximo_user');
+            const pass = localStorage.getItem('maximo_pass');
+
+            if (!host || !user || !pass) {
+                openConfigModal();
+                msgBox.className = 'msg-box error';
+                msgBox.innerText = 'Lỗi: Chưa cấu hình kết nối Maximo. Vui lòng nhập thông tin trong Popup.';
+                return;
+            }
+
+            resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">Đang tải trang ${currentPage}...</div>`;
+
+            try {
+                const response = await fetch('/api/execute-sql', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-maximo-host': host,
+                        'x-maximo-username': user,
+                        'x-maximo-password': pass
+                    },
+                    body: JSON.stringify({ sql, page: currentPage })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Lỗi không xác định từ Server');
+                }
+
+                addHistory(sql);
+
+                if (result.action === 'SELECT') {
+                    currentData = result.data || [];
+                    hasMore = result.hasMore || false;
+                    updatePaginationButtons();
+                    renderResults();
+                } else {
+                    currentData = [];
+                    filteredData = [];
+                    hasMore = false;
+                    updatePaginationButtons();
+                    resContainer.innerHTML = '';
+                    msgBox.className = 'msg-box success';
+                    msgBox.innerText = result.message || 'Thực thi câu lệnh thành công!';
+                }
+
+            } catch (err) {
+                resContainer.innerHTML = '';
+                msgBox.className = 'msg-box error';
+                msgBox.innerText = 'Lỗi: ' + err.message;
+            }
+        }
+
+        function renderResults() {
+            const resContainer = document.getElementById('resultsContainer');
+            const keyword = document.getElementById('filterInput').value.trim().toLowerCase();
+
+            if (!currentData || currentData.length === 0) {
+                resContainer.innerHTML = '<div style="color: #888; text-align: center; margin-top: 50px;">Không tìm thấy bản ghi phù hợp.</div>';
+                return;
+            }
+
+            if (keyword) {
+                filteredData = currentData.filter(row => {
+                    return Object.values(row).some(val => 
+                        val !== null && val !== undefined && String(val).toLowerCase().includes(keyword)
+                    );
+                });
+            } else {
+                filteredData = [...currentData];
+            }
+
+            if (filteredData.length === 0) {
+                resContainer.innerHTML = `<div style="color: #f88080; text-align: center; margin-top: 50px;">Không tìm thấy kết quả phù hợp với từ khóa: "<b>${keyword}</b>"</div>`;
+                return;
+            }
+
+            if (viewMode === 'JSON') {
+                resContainer.innerHTML = `<pre style="color: #9cdcfe; font-size: 13px; margin: 0; padding: 10px;">${JSON.stringify(filteredData, null, 2)}</pre>`;
+                return;
+            }
+
+            const columns = Object.keys(filteredData[0]);
+            let html = '<table><thead><tr><th class="stt-col">STT</th>';
+            columns.forEach(col => html += `<th>${col}</th>`);
+            html += '</tr></thead><tbody>';
+
+            const startStt = (currentPage - 1) * 100;
+            filteredData.forEach((row, idx) => {
+                html += `<tr><td class="stt-col">${startStt + idx + 1}</td>`;
+                columns.forEach(col => html += `<td>${row[col] !== undefined ? row[col] : ''}</td>`);
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            resContainer.innerHTML = html;
+        }
+
+        function toggleView() {
+            viewMode = viewMode === 'TABLE' ? 'JSON' : 'TABLE';
+            renderResults();
+        }
+
+        function exportExcel() {
+            const dataToExport = filteredData.length > 0 ? filteredData : currentData;
+            if (!dataToExport || dataToExport.length === 0) {
+                alert('Không có dữ liệu để xuất Excel!');
+                return;
+            }
+            const ws = XLSX.utils.json_to_sheet(dataToExport);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Maximo_Data");
+            XLSX.writeFile(wb, `Maximo_Query_Page_${currentPage}.xlsx`);
+        }
+
+        function addHistory(sql) {
+            history = history.filter(h => h !== sql);
+            history.unshift(sql);
+            if (history.length > 20) history.pop();
+            localStorage.setItem('maximo_sql_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function loadHistory() {
+            history = JSON.parse(localStorage.getItem('maximo_sql_history') || '[]');
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            history.forEach(sql => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerText = sql;
+                item.onclick = () => editor.setValue(sql);
+                list.appendChild(item);
+            });
+        }
+    </script>
+</body>
+</html>
