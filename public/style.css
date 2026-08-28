@@ -107,3 +107,45 @@ pre { padding: 10px; color: #9cdcfe; font-family: Consolas, monospace; }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; margin-bottom: 5px; font-size: 12px; color: #aaa; }
 .form-group input { width: 100%; padding: 8px; background: #1e1e1e; border: 1px solid #3c3c3c; color: #fff; border-radius: 4px; font-family: 'Segoe UI', sans-serif; }
+
+/* Styling nút Format SQL */
+.btn-format { background-color: #6a1b9a; color: white; }
+.btn-format:hover { background-color: #4a148c; }
+
+/* Styling Công tắc Safe Mode */
+.safe-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #252526;
+    padding: 5px 10px;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+}
+.safe-mode-toggle input { display: none; }
+.safe-mode-toggle .slider {
+    width: 28px;
+    height: 14px;
+    background-color: #555;
+    border-radius: 10px;
+    position: relative;
+    transition: 0.3s;
+}
+.safe-mode-toggle .slider::before {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: white;
+    top: 2px;
+    left: 2px;
+    transition: 0.3s;
+}
+.safe-mode-toggle input:checked + .slider { background-color: #2e7d32; }
+.safe-mode-toggle input:checked + .slider::before { transform: translateX(14px); }
+.safe-mode-toggle .label-text { color: #81c784; font-weight: bold; }
+.safe-mode-toggle input:not(:checked) ~ .label-text { color: #e57373; }

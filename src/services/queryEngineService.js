@@ -363,7 +363,16 @@ const axios = require('axios');
  * Thực thi SQL với cấu hình bắt buộc từ giao diện UI
  */
 exports.execute = async (sqlString, page = 1, config = {}) => {
-    const { host, context, username, password } = config; // Nhận biến context
+    const { host, context, username, password, safeMode } = config; // Nhận biến context và safeMode
+
+    if (safeMode) {
+        const upper = sqlString.trim().toUpperCase();
+        if (!upper.startsWith('SELECT') && !upper.startsWith('WITH') && upper !== 'COMMIT' && upper !== 'ROLLBACK') {
+            throw new Error('🛡️ Server đã từ chối lệnh DML do Chế độ Safe Mode đang BẬT.');
+        }
+    }
+
+
 
     if (!host || !username || !password) {
         throw new Error('Chưa cấu hình thông tin kết nối Maximo (Host, Username, Password). Vui lòng bổ sung thông tin.');

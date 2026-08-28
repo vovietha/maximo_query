@@ -32,6 +32,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    const savedSafeMode = localStorage.getItem('maximo_safe_mode');
+    const safeCheck = document.getElementById('safeModeCheck');
+    if (safeCheck && savedSafeMode !== null) {
+        safeCheck.checked = (savedSafeMode === 'true');
+    }
 
     // Tự động gợi ý từ khóa khi gõ chữ
     editor.on("inputRead", (cm, change) => {
@@ -50,6 +55,75 @@ document.addEventListener('DOMContentLoaded', () => {
     editor.setValue("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
     loadHistory();
 });
+
+function toggleSafeMode() {
+    const isSafe = document.getElementById('safeModeCheck').checked;
+    localStorage.setItem('maximo_safe_mode', isSafe);
+}
+
+// Hàm Format SQL thông minh (Bảo vệ tuyệt đối dòng Comment --)
+function formatSql() {
+    if (!editor) return;
+    const text = editor.getValue();
+    if (!text.trim()) return;
+
+    const lines = text.split(/\r?\n/);
+    const formattedLines = [];
+    
+    // Danh sách các từ khóa SQL cần ngắt dòng & viết hoa
+    const keywords = [
+        "SELECT", "FROM", "WHERE", "AND", "OR", "GROUP BY", "ORDER BY",
+        "HAVING", "LIMIT", "OFFSET", "JOIN", "LEFT JOIN", "RIGHT JOIN",
+        "INNER JOIN", "OUTER JOIN", "UPDATE", "SET", "INSERT INTO",
+        "VALUES", "DELETE FROM", "DELETE"
+    ];
+
+    for (let line of lines) {
+        let trimmed = line.trim();
+        if (!trimmed) continue; // Bỏ qua dòng trống
+
+        // 1. Nếu dòng bắt đầu bằng dấu comment '--' -> Giữ nguyên toàn bộ dòng comment
+        if (trimmed.startsWith('--')) {
+            formattedLines.push(trimmed);
+            continue;
+        }
+
+        // 2. Tách phần Code và phần Comment ở cuối dòng (nếu có)
+        let codePart = trimmed;
+        let commentPart = '';
+        const commentIdx = trimmed.indexOf('--');
+        
+        if (commentIdx !== -1) {
+            codePart = trimmed.substring(0, commentIdx).trim();
+            commentPart = ' ' + trimmed.substring(commentIdx).trim();
+        }
+
+        if (codePart) {
+            // Ngắt dòng trước từ khóa nếu nhiều câu lệnh bị dính trên 1 dòng
+            keywords.forEach(kw => {
+                const regex = new RegExp(`(?<!^)\\b${kw}\\b`, 'gi');
+                codePart = codePart.replace(regex, `\n${kw}`);
+            });
+
+            // Viết hoa các từ khóa SQL
+            keywords.forEach(kw => {
+                const regex = new RegExp(`\\b${kw}\\b`, 'gi');
+                codePart = codePart.replace(regex, kw);
+            });
+        }
+
+        // 3. Đưa các dòng đã format vào kết quả
+        const fullLine = (codePart + commentPart).trim();
+        if (fullLine) {
+            const subLines = fullLine.split('\n');
+            subLines.forEach(sl => {
+                if (sl.trim()) formattedLines.push(sl.trim());
+            });
+        }
+    }
+
+    editor.setValue(formattedLines.join('\n'));
+}
 
 // Modal Controls - Bổ sung load Context Path
 function openConfigModal() {
@@ -104,6 +178,7 @@ async function runQuery(page = 1) {
 
     const selectedSql = editor.getSelection().trim();
     const sql = selectedSql || editor.getValue().trim();
+    const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
 
     const msgBox = document.getElementById('msgBox');
     const resContainer = document.getElementById('resultsContainer');
@@ -111,6 +186,22 @@ async function runQuery(page = 1) {
     msgBox.className = 'msg-box';
     msgBox.style.display = 'none';
     document.getElementById('filterInput').value = '';
+
+    // KIỂM TRA SAFE MODE TẠI CLIENT
+    if (isSafeMode) {
+        const cleanUpper = sql.toUpperCase().trim();
+        const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
+        const isForbidden = forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `));
+        
+        if (isForbidden) {
+            msgBox.className = 'msg-box error';
+            msgBox.style.display = 'block';
+            msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu! Hãy TẮT Safe Mode trên Toolbar nếu bạn muốn thực thi DML.';
+            return;
+        }
+    }
+
+
 
     const host = localStorage.getItem('maximo_host');
     const context = localStorage.getItem('maximo_context') || 'maximo';
@@ -135,7 +226,8 @@ async function runQuery(page = 1) {
                 'x-maximo-host': host,
                 'x-maximo-context': context,
                 'x-maximo-username': user,
-                'x-maximo-password': pass
+                'x-maximo-password': pass,
+                'x-safe-mode': isSafeMode ? 'true' : 'false' // Truyền trạng thái lên Server
             },
             body: JSON.stringify({ sql, page: currentPage })
         });

@@ -37,13 +37,23 @@
             </div>
 
             <div class="toolbar">
-                <div class="action-btns">
-                    <button class="btn btn-run" id="btn-execute" onclick="runQuery(1)">Chạy Query (Ctrl+Enter)</button>
-                    <button class="btn btn-commit" id="btn-commit" onclick="executeCommand('COMMIT')">Commit</button>
-                    <button class="btn btn-rollback" id="btn-rollback" onclick="executeCommand('ROLLBACK')">Rollback</button>
-                    <button class="btn btn-toggle" id="btn-toggle-view" onclick="toggleView()">Đổi View (Table/JSON)</button>
-                    <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Lọc kết quả real-time..." oninput="renderResults()" />
-                </div>
+                <!-- Bổ sung vào nhóm .action-btns trong toolbar -->
+            <div class="action-btns">
+                <button class="btn btn-run" id="btn-execute" onclick="runQuery(1)">Chạy Query (Ctrl+Enter)</button>
+                <button class="btn btn-commit" id="btn-commit" onclick="executeCommand('COMMIT')">Commit</button>
+                <button class="btn btn-rollback" id="btn-rollback" onclick="executeCommand('ROLLBACK')">Rollback</button>
+                <button class="btn btn-format" id="btn-format" onclick="formatSql()">🧹 Format SQL</button>
+                <button class="btn btn-toggle" id="btn-toggle-view" onclick="toggleView()">Đổi View (Table/JSON)</button>
+                
+                <!-- Công tắc Safe Mode -->
+                <label class="safe-mode-toggle" title="Khi BẬT, chặn tất cả câu lệnh UPDATE/DELETE/INSERT/DROP">
+                    <input type="checkbox" id="safeModeCheck" onchange="toggleSafeMode()" checked>
+                    <span class="slider"></span>
+                    <span class="label-text">🛡️ Safe Mode</span>
+                </label>
+
+                <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Lọc kết quả real-time..." oninput="renderResults()" />
+            </div>
                 
                 <!-- Thanh Phân Trang & Xuất Excel -->
                 <div class="pagination-container">

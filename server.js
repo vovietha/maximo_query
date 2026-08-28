@@ -18,7 +18,8 @@ const handleExecuteSql = async (req, res) => {
             host: req.headers['x-maximo-host'],
             context: req.headers['x-maximo-context'] || 'maximo',
             username: req.headers['x-maximo-username'],
-            password: req.headers['x-maximo-password']
+            password: req.headers['x-maximo-password'],
+            safeMode: req.headers['x-safe-mode'] === 'true' // Đọc trạng thái Safe Mode
         };
 
         const result = await queryEngineService.execute(sql, page, config);
