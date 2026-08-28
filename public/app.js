@@ -311,29 +311,40 @@ function updatePaginationButtons() {
 // Run Query backup
 // async function runQuery(page = 1) {
 //     currentPage = page;
+    
 
 //     const selectedSql = editor.getSelection().trim();
-//     const sql = selectedSql || editor.getValue().trim();
+//     let sql = selectedSql || editor.getValue().trim();
 //     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
+    
+//     // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
+//     const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
+//     const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
 
 //     const msgBox = document.getElementById('msgBox');
 //     const resContainer = document.getElementById('resultsContainer');
+//     const statsBox = document.getElementById('queryStats');
 
 //     msgBox.className = 'msg-box';
 //     msgBox.style.display = 'none';
+//     if (statsBox) statsBox.style.display = 'none';
 //     document.getElementById('filterInput').value = '';
 
+//     // 1. Kiểm tra Safe Mode
 //     if (isSafeMode) {
 //         const cleanUpper = sql.toUpperCase().trim();
 //         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
-//         const isForbidden = forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `));
-        
-//         if (isForbidden) {
+//         if (forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `))) {
 //             msgBox.className = 'msg-box error';
 //             msgBox.style.display = 'block';
 //             msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu!';
 //             return;
 //         }
+//     }
+
+//     // 2. Áp dụng Auto Limit dựa trên tham số từ ô Input
+//     if (isAutoLimit) {
+//         sql = applyAutoLimit(sql, autoLimitVal);
 //     }
 
 //     const host = localStorage.getItem('maximo_host');
@@ -343,13 +354,12 @@ function updatePaginationButtons() {
 
 //     if (!host || !user || !pass) {
 //         openConfigModal();
-//         msgBox.className = 'msg-box error';
-//         msgBox.style.display = 'block';
-//         msgBox.innerText = 'Lỗi: Chưa cấu hình kết nối Maximo. Vui lòng nhập thông tin trong Popup.';
 //         return;
 //     }
 
-//     resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">Đang thực thi câu lệnh SQL...</div>`;
+//     resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">⏳ Đang thực thi câu lệnh SQL...</div>`;
+
+//     const startTime = performance.now();
 
 //     try {
 //         const response = await fetch('/api/execute-sql', {
@@ -365,6 +375,7 @@ function updatePaginationButtons() {
 //             body: JSON.stringify({ sql, page: currentPage })
 //         });
 
+//         const duration = Math.round(performance.now() - startTime);
 //         const result = await response.json();
 
 //         if (!response.ok) {
@@ -378,6 +389,11 @@ function updatePaginationButtons() {
 //             hasMore = result.hasMore || false;
 //             updatePaginationButtons();
 //             renderResults();
+
+//             if (statsBox) {
+//                 statsBox.style.display = 'block';
+//                 statsBox.innerText = `⚡ ${currentData.length} bản ghi | 🕒 ${duration} ms`;
+//             }
 //         } else {
 //             currentData = [];
 //             filteredData = [];
@@ -387,7 +403,7 @@ function updatePaginationButtons() {
 
 //             msgBox.className = 'msg-box success';
 //             msgBox.style.display = 'block';
-//             msgBox.innerText = result.message || 'Thực thi câu lệnh thành công!';
+//             msgBox.innerText = `${result.message || 'Thực thi thành công!'} (Thời gian: ${duration} ms)`;
 //         }
 
 //     } catch (err) {
@@ -402,14 +418,6 @@ function updatePaginationButtons() {
 async function runQuery(page = 1) {
     currentPage = page;
 
-    const selectedSql = editor.getSelection().trim();
-    let sql = selectedSql || editor.getValue().trim();
-    const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
-    
-    // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
-    const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
-    const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
-
     const msgBox = document.getElementById('msgBox');
     const resContainer = document.getElementById('resultsContainer');
     const statsBox = document.getElementById('queryStats');
@@ -419,7 +427,26 @@ async function runQuery(page = 1) {
     if (statsBox) statsBox.style.display = 'none';
     document.getElementById('filterInput').value = '';
 
-    // 1. Kiểm tra Safe Mode
+    // 1. Lấy câu lệnh SQL tại vị trí con trỏ (hoặc đoạn bôi đen)
+    let sql = getCurrentStatementAtCursor(editor);
+
+    if (!sql) {
+        msgBox.className = 'msg-box error';
+        msgBox.style.display = 'block';
+        msgBox.innerText = '⚠️ Không tìm thấy câu lệnh SQL tại vị trí con trỏ!';
+        return;
+    }
+
+    // Tự động xóa dấu ';' thừa ở cuối câu lệnh để tránh lỗi cú pháp CSDL
+    sql = sql.replace(/;+$/, '').trim();
+
+    const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
+    
+    // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
+    const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
+    const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
+
+    // 2. Kiểm tra Safe Mode
     if (isSafeMode) {
         const cleanUpper = sql.toUpperCase().trim();
         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
@@ -431,7 +458,7 @@ async function runQuery(page = 1) {
         }
     }
 
-    // 2. Áp dụng Auto Limit dựa trên tham số từ ô Input
+    // 3. Áp dụng Auto Limit dựa trên tham số từ ô Input
     if (isAutoLimit) {
         sql = applyAutoLimit(sql, autoLimitVal);
     }
@@ -970,4 +997,34 @@ function updateStatusBar() {
             statusLimitText.style.color = '#888';
         }
     }
+}
+
+// Tự động trích xuất câu lệnh SQL tại vị trí con trỏ chuột
+function getCurrentStatementAtCursor(cm) {
+    if (!cm) return '';
+
+    // 1. Ưu tiên hàng đầu: Nếu người dùng đã chủ động bôi đen -> Lấy đoạn bôi đen
+    const selectedText = cm.getSelection().trim();
+    if (selectedText) return selectedText;
+
+    const fullText = cm.getValue();
+    if (!fullText.trim()) return '';
+
+    // 2. Chuyển vị trí dòng/cột (line/ch) của con trỏ thành Index chuỗi
+    const cursorPos = cm.getCursor();
+    const cursorIndex = cm.indexFromPos(cursorPos);
+
+    // 3. Tìm dấu ';' gần nhất PHÍA TRƯỚC và PHÍA SAU con trỏ
+    const lastSemicolon = fullText.lastIndexOf(';', cursorIndex - 1);
+    let nextSemicolon = fullText.indexOf(';', cursorIndex);
+
+    if (nextSemicolon === -1) {
+        nextSemicolon = fullText.length;
+    }
+
+    // 4. Cắt chuỗi nằm giữa 2 dấu ';'
+    const startIndex = (lastSemicolon === -1) ? 0 : lastSemicolon + 1;
+    const currentSql = fullText.substring(startIndex, nextSemicolon).trim();
+
+    return currentSql;
 }
