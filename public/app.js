@@ -66,6 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     resizer.observe(document.querySelector('.editor-container'));
 
+    // Đăng ký sự kiện cập nhật Status Bar real-time khi gõ số hoặc tích chọn Limit
+    const limitCheck = document.getElementById('autoLimitCheck');
+    const limitInput = document.getElementById('autoLimitValue');
+
+    if (limitCheck) limitCheck.addEventListener('change', updateStatusBar);
+    if (limitInput) limitInput.addEventListener('input', updateStatusBar);
+
+
     // Khởi tạo Tab & Lịch sử
     addTab("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
     loadHistory();
@@ -932,7 +940,9 @@ function toggleSidebar() {
 function updateStatusBar() {
     const host = localStorage.getItem('maximo_host');
     const context = localStorage.getItem('maximo_context') || 'maximo';
-    const limitVal = document.getElementById('autoLimitValue')?.value || '200';
+
+    const limitCheck = document.getElementById('autoLimitCheck');
+    const limitInput = document.getElementById('autoLimitValue');
 
     const statusDot = document.getElementById('statusDot');
     const statusHostText = document.getElementById('statusHostText');
@@ -941,12 +951,23 @@ function updateStatusBar() {
 
     if (host) {
         if (statusDot) statusDot.className = 'status-dot connected';
-        if (statusHostText) statusHostText.innerText = ` ${host}`;
+        if (statusHostText) statusHostText.innerText = host;
     } else {
         if (statusDot) statusDot.className = 'status-dot disconnected';
         if (statusHostText) statusHostText.innerText = 'Chưa kết nối Maximo';
     }
 
     if (statusContextText) statusContextText.innerText = `Context: /${context}`;
-    if (statusLimitText) statusLimitText.innerText = `Limit: ${limitVal}`;
+
+    // Xử lý hiển thị động cho Limit
+    if (statusLimitText) {
+        if (limitCheck && !limitCheck.checked) {
+            statusLimitText.innerText = 'Limit: OFF';
+            statusLimitText.style.color = '#e57373'; // Màu đỏ nhạt khi TẮT
+        } else {
+            const limitVal = limitInput ? limitInput.value : '200';
+            statusLimitText.innerText = `Limit: ${limitVal}`;
+            statusLimitText.style.color = '#888';
+        }
+    }
 }
