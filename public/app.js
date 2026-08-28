@@ -13,6 +13,8 @@ let tabCounter = 0;
 
 let MAXIMO_SCHEMA = {};
 
+let favorites = [];
+
 document.addEventListener('DOMContentLoaded', () => {
     // Khởi tạo CodeMirror IDE
     editor = CodeMirror.fromTextArea(document.getElementById('sqlEditor'), {
@@ -68,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addTab("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
     loadHistory();
     loadDynamicSchema();
+    loadFavorites();
 });
 
 // Nạp Schema từ Maximo
@@ -504,23 +507,24 @@ function exportExcel() {
 function switchSidebarTab(tabName) {
     const schemaTab = document.getElementById('sbTabSchema');
     const historyTab = document.getElementById('sbTabHistory');
+    const favTab = document.getElementById('sbTabFav');
+
     const schemaPanel = document.getElementById('panelSchema');
     const historyPanel = document.getElementById('panelHistory');
+    const favPanel = document.getElementById('panelFav');
 
-    if (!schemaTab || !historyTab || !schemaPanel || !historyPanel) return;
+    if (!schemaTab || !historyTab || !favTab) return;
 
-    if (tabName === 'SCHEMA') {
-        schemaTab.classList.add('active');
-        historyTab.classList.remove('active');
-        schemaPanel.style.display = 'flex';
-        historyPanel.style.display = 'none';
-    } else if (tabName === 'HISTORY') {
-        historyTab.classList.add('active');
-        schemaTab.classList.remove('active');
-        historyPanel.style.display = 'flex';
-        schemaPanel.style.display = 'none';
-        renderHistory();
-    }
+    schemaTab.classList.toggle('active', tabName === 'SCHEMA');
+    historyTab.classList.toggle('active', tabName === 'HISTORY');
+    favTab.classList.toggle('active', tabName === 'FAV');
+
+    schemaPanel.style.display = tabName === 'SCHEMA' ? 'flex' : 'none';
+    historyPanel.style.display = tabName === 'HISTORY' ? 'flex' : 'none';
+    favPanel.style.display = tabName === 'FAV' ? 'flex' : 'none';
+
+    if (tabName === 'HISTORY') renderHistory();
+    if (tabName === 'FAV') renderFavorites();
 }
 
 // Quản lý Lịch sử Query
@@ -559,6 +563,82 @@ function renderHistory() {
                 editor.focus();
             }
         };
+        list.appendChild(item);
+    });
+}
+
+// Lưu Query hiện tại vào Yêu thích
+function saveCurrentQueryToFavorites() {
+    if (!editor) return;
+    const selectedSql = editor.getSelection().trim();
+    const sql = selectedSql || editor.getValue().trim();
+
+    if (!sql) {
+        alert("Khung gõ SQL đang rỗng!");
+        return;
+    }
+
+    const title = prompt("Nhập tên gợi nhớ cho câu lệnh SQL này:", "Query " + (favorites.length + 1));
+    if (!title || !title.trim()) return;
+
+    const newFav = {
+        id: Date.now(),
+        title: title.trim(),
+        sql: sql
+    };
+
+    favorites.unshift(newFav);
+    localStorage.setItem('maximo_sql_favs', JSON.stringify(favorites));
+    
+    switchSidebarTab('FAV');
+    renderFavorites();
+}
+
+// Xóa 1 Query khỏi Yêu thích
+function deleteFavorite(id, event) {
+    event.stopPropagation();
+    if (!confirm("Bạn có chắc muốn xóa Query này khỏi danh sách Yêu thích?")) return;
+
+    favorites = favorites.filter(f => f.id !== id);
+    localStorage.setItem('maximo_sql_favs', JSON.stringify(favorites));
+    renderFavorites();
+}
+
+function loadFavorites() {
+    favorites = JSON.parse(localStorage.getItem('maximo_sql_favs') || '[]');
+    renderFavorites();
+}
+
+// Render danh sách Query Yêu thích
+function renderFavorites() {
+    const list = document.getElementById('favList');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    if (!favorites || favorites.length === 0) {
+        list.innerHTML = '<div style="font-size:12px; color:#888; padding: 10px;">Chưa có Query nào được lưu. Bấm "⭐ Lưu Query" trên Toolbar để thêm.</div>';
+        return;
+    }
+
+    favorites.forEach(fav => {
+        const item = document.createElement('div');
+        item.className = 'fav-item';
+        item.onclick = () => {
+            if (editor) {
+                editor.setValue(fav.sql);
+                editor.focus();
+            }
+        };
+
+        item.innerHTML = `
+            <div class="fav-header">
+                <span>⭐ ${fav.title}</span>
+                <span class="fav-del-btn" onclick="deleteFavorite(${fav.id}, event)" title="Xóa">&times;</span>
+            </div>
+            <div class="fav-sql">${fav.sql}</div>
+        `;
+
         list.appendChild(item);
     });
 }

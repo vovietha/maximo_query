@@ -50,7 +50,7 @@
                 <button class="btn btn-rollback" id="btn-rollback" onclick="executeCommand('ROLLBACK')">Rollback</button>
                 <button class="btn btn-format" id="btn-format" onclick="formatSql()">🧹 Format SQL</button>
                 <button class="btn btn-toggle" id="btn-toggle-view" onclick="toggleView()">Đổi View (Table/JSON)</button>
-                
+                <button class="btn btn-fav" id="btn-fav" onclick="saveCurrentQueryToFavorites()" title="Lưu câu lệnh hiện tại vào danh sách Yêu thích">⭐ Lưu Query</button>
                 <!-- Công tắc Safe Mode -->
                 <label class="safe-mode-toggle" title="Khi BẬT, chặn tất cả câu lệnh UPDATE/DELETE/INSERT/DROP">
                     <input type="checkbox" id="safeModeCheck" onchange="toggleSafeMode()" checked>
@@ -81,10 +81,17 @@
         <div class="sidebar">
             <!-- Thanh Tab Sidebar -->
             <div class="sidebar-tabs">
+                <button class="sb-tab" id="sbTabFav" onclick="switchSidebarTab('FAV')">⭐ Yêu thích</button>
                 <button class="sb-tab active" id="sbTabSchema" onclick="switchSidebarTab('SCHEMA')">🗄️ CSDL (Schema)</button>
                 <button class="sb-tab" id="sbTabHistory" onclick="switchSidebarTab('HISTORY')">📜 Lịch sử</button>
             </div>
-
+             
+            
+            <!-- Panel 3: Query Yêu thích -->
+            <div id="panelFav" class="sidebar-panel" style="display: none;">
+                <div id="favList" class="history-list"></div>
+            </div>
+            
             <!-- Panel 1: Schema Browser -->
             <div id="panelSchema" class="sidebar-panel">
                 <input type="text" id="schemaSearchInput" class="filter-input" placeholder="🔍 Tìm bảng/cột Maximo..." oninput="filterSchemaTree()" style="width: 100%; margin-bottom: 8px;" />
