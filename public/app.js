@@ -18,14 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
         extraKeys: {
             "Ctrl-Space": "autocomplete",
             "Ctrl-Enter": () => { runQuery(1); },
-            
-            // Sửa hàm Toggle Comment hoạt động chuẩn cho SQL
-            "Ctrl-/": (cm) => {
-                cm.toggleComment({ lineComment: "-- " });
-            },
-            "Cmd-/": (cm) => {
-                cm.toggleComment({ lineComment: "-- " });
-            }
+            "Ctrl-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); },
+            "Cmd-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); }
         },
         hintOptions: {
             tables: {
@@ -57,9 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
 });
 
-// Modal Controls
+// Modal Controls - Bổ sung load Context Path
 function openConfigModal() {
     document.getElementById('cfgHost').value = localStorage.getItem('maximo_host') || '';
+    document.getElementById('cfgContext').value = localStorage.getItem('maximo_context') || 'maximo';
     document.getElementById('cfgUser').value = localStorage.getItem('maximo_user') || '';
     document.getElementById('cfgPass').value = localStorage.getItem('maximo_pass') || '';
     document.getElementById('configModal').style.display = 'flex';
@@ -69,8 +64,10 @@ function closeConfigModal() {
     document.getElementById('configModal').style.display = 'none';
 }
 
+// Modal Controls - Bổ sung lưu Context Path
 function saveConfig() {
     const host = document.getElementById('cfgHost').value.trim();
+    const context = (document.getElementById('cfgContext').value.trim() || 'maximo').replace(/^\/+|\/+$/g, '');
     const user = document.getElementById('cfgUser').value.trim();
     const pass = document.getElementById('cfgPass').value.trim();
 
@@ -80,6 +77,7 @@ function saveConfig() {
     }
 
     localStorage.setItem('maximo_host', host);
+    localStorage.setItem('maximo_context', context);
     localStorage.setItem('maximo_user', user);
     localStorage.setItem('maximo_pass', pass);
     alert('Đã lưu cấu hình kết nối thành công!');
@@ -100,7 +98,7 @@ function updatePaginationButtons() {
     document.getElementById('btnNext').disabled = !hasMore;
 }
 
-// Thực thi SQL (Ưu tiên đoạn văn bản đang bôi đen)
+// Thực thi SQL (Truyền header x-maximo-context)
 async function runQuery(page = 1) {
     currentPage = page;
 
@@ -115,6 +113,7 @@ async function runQuery(page = 1) {
     document.getElementById('filterInput').value = '';
 
     const host = localStorage.getItem('maximo_host');
+    const context = localStorage.getItem('maximo_context') || 'maximo';
     const user = localStorage.getItem('maximo_user');
     const pass = localStorage.getItem('maximo_pass');
 
@@ -134,6 +133,7 @@ async function runQuery(page = 1) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-maximo-host': host,
+                'x-maximo-context': context,
                 'x-maximo-username': user,
                 'x-maximo-password': pass
             },
@@ -173,7 +173,7 @@ async function runQuery(page = 1) {
     }
 }
 
-// Hàm gửi lệnh COMMIT / ROLLBACK trực tiếp
+// Lệnh COMMIT / ROLLBACK (Truyền header x-maximo-context)
 async function executeCommand(cmd) {
     const msgBox = document.getElementById('msgBox');
     const resContainer = document.getElementById('resultsContainer');
@@ -182,6 +182,7 @@ async function executeCommand(cmd) {
     msgBox.style.display = 'none';
 
     const host = localStorage.getItem('maximo_host');
+    const context = localStorage.getItem('maximo_context') || 'maximo';
     const user = localStorage.getItem('maximo_user');
     const pass = localStorage.getItem('maximo_pass');
 
@@ -196,6 +197,7 @@ async function executeCommand(cmd) {
             headers: {
                 'Content-Type': 'application/json',
                 'x-maximo-host': host,
+                'x-maximo-context': context,
                 'x-maximo-username': user,
                 'x-maximo-password': pass
             },
@@ -254,7 +256,7 @@ function renderResults() {
     columns.forEach(col => html += `<th>${col}</th>`);
     html += '</tr></thead><tbody>';
 
-    const startStt = (currentPage - 1) * 100;
+    const startStt = (currentPage - 1) * 50;
     filteredData.forEach((row, idx) => {
         html += `<tr><td class="stt-col">${startStt + idx + 1}</td>`;
         columns.forEach(col => {

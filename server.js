@@ -16,6 +16,7 @@ const handleExecuteSql = async (req, res) => {
 
         const config = {
             host: req.headers['x-maximo-host'],
+            context: req.headers['x-maximo-context'] || 'maximo',
             username: req.headers['x-maximo-username'],
             password: req.headers['x-maximo-password']
         };

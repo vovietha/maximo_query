@@ -363,21 +363,36 @@ const axios = require('axios');
  * Thực thi SQL với cấu hình bắt buộc từ giao diện UI
  */
 exports.execute = async (sqlString, page = 1, config = {}) => {
-    const { host, username, password } = config;
+    const { host, context, username, password } = config; // Nhận biến context
 
-    // YÊU CẦU: Nếu người dùng không điền thông tin -> Không cho truy cập DB
     if (!host || !username || !password) {
-        throw new Error('Chưa cấu hình thông tin kết nối Maximo (Host, Username, Password). Vui lòng bấm vào nút "⚙️ Cấu hình kết nối" để nhập thông tin.');
+        throw new Error('Chưa cấu hình thông tin kết nối Maximo (Host, Username, Password). Vui lòng bổ sung thông tin.');
     }
 
     if (!sqlString || !sqlString.trim()) {
         throw new Error('Câu lệnh SQL không được để trống.');
     }
 
-    // Tạo MAXAUTH từ thông tin người dùng nhập
     const maxauth = Buffer.from(`${username}:${password}`).toString('base64');
     const cleanHost = host.trim().replace(/\/+$/, '');
-    const url = `${cleanHost}/maximo/oslc/script/EXEC_SQL`;
+    const cleanContext = (context || 'maximo').trim().replace(/^\/+|\/+$/g, '');
+
+    let url;
+    if (cleanHost.includes('/oslc/script/EXEC_SQL')) {
+        url = cleanHost;
+    } else {
+        try {
+            const parsed = new URL(cleanHost);
+            if (parsed.pathname && parsed.pathname !== '/') {
+                url = `${cleanHost}/oslc/script/EXEC_SQL`;
+            } else {
+                // Ghép cleanContext động (VD: /max76)
+                url = `${cleanHost}/${cleanContext}/oslc/script/EXEC_SQL`;
+            }
+        } catch (e) {
+            url = `${cleanHost}/${cleanContext}/oslc/script/EXEC_SQL`;
+        }
+    }
 
     try {
         const response = await axios.post(url, sqlString.trim(), {
@@ -389,14 +404,13 @@ exports.execute = async (sqlString, page = 1, config = {}) => {
         });
 
         const result = response.data;
-
         if (!result.success) {
             throw new Error(result.error || 'Lỗi thực thi SQL từ Maximo Database');
         }
 
         if (result.action === 'SELECT') {
             const allRows = result.data || [];
-            const pageSize = 100;
+            const pageSize = 50;
             const startIndex = (page - 1) * pageSize;
             const pagedRows = allRows.slice(startIndex, startIndex + pageSize);
 
