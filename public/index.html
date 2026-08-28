@@ -32,9 +32,15 @@
     <!-- Main Console Layout -->
     <div class="container">
         <div class="main-panel">
+            <div class="tab-bar-container">
+                <div class="tab-bar" id="tabBar"></div>
+                <button class="btn-add-tab" onclick="addTab()" title="Mở Tab Mới">+</button>
+            </div>
+
             <div class="editor-container">
                 <textarea id="sqlEditor"></textarea>
             </div>
+            
 
             <div class="toolbar">
                 <!-- Bổ sung vào nhóm .action-btns trong toolbar -->
@@ -73,8 +79,22 @@
 
         <!-- Sidebar Lịch sử Query -->
         <div class="sidebar">
-            <h3>Lịch sử Query</h3>
-            <div id="historyList" class="history-list"></div>
+            <!-- Thanh Tab Sidebar -->
+            <div class="sidebar-tabs">
+                <button class="sb-tab active" id="sbTabSchema" onclick="switchSidebarTab('SCHEMA')">🗄️ CSDL (Schema)</button>
+                <button class="sb-tab" id="sbTabHistory" onclick="switchSidebarTab('HISTORY')">📜 Lịch sử</button>
+            </div>
+
+            <!-- Panel 1: Schema Browser -->
+            <div id="panelSchema" class="sidebar-panel">
+                <input type="text" id="schemaSearchInput" class="filter-input" placeholder="🔍 Tìm bảng/cột Maximo..." oninput="filterSchemaTree()" style="width: 100%; margin-bottom: 8px;" />
+                <div id="schemaTreeList" class="schema-tree-list"></div>
+            </div>
+
+            <!-- Panel 2: Lịch sử Query -->
+            <div id="panelHistory" class="sidebar-panel" style="display: none;">
+                <div id="historyList" class="history-list"></div>
+            </div>
         </div>
     </div>
 

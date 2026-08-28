@@ -6,6 +6,13 @@ let history = [];
 let currentPage = 1;
 let hasMore = false;
 
+// Quản lý Tab State
+let tabs = [];
+let activeTabId = null;
+let tabCounter = 0;
+
+let MAXIMO_SCHEMA = {};
+
 document.addEventListener('DOMContentLoaded', () => {
     // Khởi tạo CodeMirror IDE
     editor = CodeMirror.fromTextArea(document.getElementById('sqlEditor'), {
@@ -24,44 +31,167 @@ document.addEventListener('DOMContentLoaded', () => {
         hintOptions: {
             tables: {
                 workorder: ["wonum", "description", "status", "siteid", "worktype", "assetnum", "location", "reportdate", "historyflag"],
-                asset: ["assetnum", "description", "siteid", "status", "location"],
-                locations: ["location", "description", "siteid", "status", "type"],
-                person: ["personid", "firstname", "lastname", "displayname"],
-                inventory: ["itemnum", "location", "siteid", "issueunit"],
-                invtrans: ["itemnum", "storeloc", "siteid", "transdate", "quantity", "transtype", "curbal"]
+                asset: ["assetnum", "description", "siteid", "status", "location"]
             }
         }
     });
+
+    // Tải Safe Mode state
     const savedSafeMode = localStorage.getItem('maximo_safe_mode');
     const safeCheck = document.getElementById('safeModeCheck');
     if (safeCheck && savedSafeMode !== null) {
         safeCheck.checked = (savedSafeMode === 'true');
     }
 
-    // Tự động gợi ý từ khóa khi gõ chữ
+    // Tự động lưu nội dung SQL vào Tab đang active
+    editor.on("change", () => {
+        const currentTab = tabs.find(t => t.id === activeTabId);
+        if (currentTab) {
+            currentTab.sql = editor.getValue();
+        }
+    });
+
+    // Tự động gợi ý từ khóa khi gõ
     editor.on("inputRead", (cm, change) => {
         if (change.origin !== '+delete' && /[a-zA-Z._]/.test(change.text[0])) {
             CodeMirror.commands.autocomplete(cm, null, { completeSingle: false });
         }
     });
 
-    // Theo dõi thay đổi kích thước khung gõ SQL để tự refresh dòng
+    // Theo dõi kích thước Editor
     const resizer = new ResizeObserver(() => {
         if (editor) editor.refresh();
     });
     resizer.observe(document.querySelector('.editor-container'));
 
-    // Gán câu lệnh SQL mặc định ban đầu
-    editor.setValue("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
+    // Khởi tạo Tab & Lịch sử
+    addTab("SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'");
     loadHistory();
+    loadDynamicSchema();
 });
+
+// Nạp Schema từ Maximo
+async function loadDynamicSchema() {
+    const treeContainer = document.getElementById('schemaTreeList');
+    if (!treeContainer) return;
+
+    try {
+        const host = localStorage.getItem('maximo_host');
+        const context = localStorage.getItem('maximo_context') || 'maximo';
+        const user = localStorage.getItem('maximo_user');
+        const pass = localStorage.getItem('maximo_pass');
+
+        if (!host || !user || !pass) {
+            treeContainer.innerHTML = '<div style="color: #888; padding: 10px; font-size: 11px;">Bấm "Cấu hình kết nối" để tải Schema.</div>';
+            return;
+        }
+
+        treeContainer.innerHTML = '<div style="color: #61dafb; padding: 10px; font-size: 12px;">⏳ Đang tải CSDL từ Maximo...</div>';
+
+        const schemaSql = "SELECT lower(objectname) as tablename, lower(attributename) as colname FROM maxattribute ORDER BY objectname, attributename";
+
+        const response = await fetch('/api/execute-sql', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-maximo-host': host,
+                'x-maximo-context': context,
+                'x-maximo-username': user,
+                'x-maximo-password': pass,
+                'x-safe-mode': 'true'
+            },
+            body: JSON.stringify({ sql: schemaSql, page: -1 })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.action === 'SELECT' && result.data) {
+            MAXIMO_SCHEMA = {};
+            result.data.forEach(row => {
+                const table = row.tablename;
+                const col = row.colname;
+                if (!MAXIMO_SCHEMA[table]) MAXIMO_SCHEMA[table] = [];
+                MAXIMO_SCHEMA[table].push(col);
+            });
+
+            if (editor) editor.setOption("hintOptions", { tables: MAXIMO_SCHEMA });
+            renderSchemaTree();
+        } else {
+            treeContainer.innerHTML = `<div style="color: #888; padding: 10px; font-size: 11px;">Tạm thời bỏ qua Schema: ${result.error || 'Lỗi kết nối'}</div>`;
+        }
+    } catch (err) {
+        treeContainer.innerHTML = `<div style="color: #888; padding: 10px; font-size: 11px;">Tạm thời bỏ qua Schema.</div>`;
+    }
+}
 
 function toggleSafeMode() {
     const isSafe = document.getElementById('safeModeCheck').checked;
     localStorage.setItem('maximo_safe_mode', isSafe);
 }
 
-// Hàm Format SQL thông minh (Bảo vệ tuyệt đối dòng Comment --)
+// Hàm tạo Tab mới
+function addTab(initialSql = '') {
+    tabCounter++;
+    const defaultSql = initialSql || "SELECT wonum, description, status, siteid FROM workorder WHERE siteid='BEDFORD'";
+    
+    const newTab = {
+        id: tabCounter,
+        title: `Query ${tabCounter}`,
+        sql: defaultSql
+    };
+
+    tabs.push(newTab);
+    switchTab(newTab.id);
+}
+
+function switchTab(tabId) {
+    if (activeTabId && editor) {
+        const currentTab = tabs.find(t => t.id === activeTabId);
+        if (currentTab) currentTab.sql = editor.getValue();
+    }
+
+    activeTabId = tabId;
+    const targetTab = tabs.find(t => t.id === tabId);
+
+    if (targetTab && editor) {
+        editor.setValue(targetTab.sql);
+        editor.focus();
+    }
+
+    renderTabs();
+}
+
+function closeTab(tabId, event) {
+    event.stopPropagation();
+    
+    if (tabs.length === 1) {
+        alert("Cần giữ lại ít nhất 1 Tab làm việc!");
+        return;
+    }
+
+    tabs = tabs.filter(t => t.id !== tabId);
+
+    if (activeTabId === tabId) {
+        const nextTab = tabs[tabs.length - 1];
+        switchTab(nextTab.id);
+    } else {
+        renderTabs();
+    }
+}
+
+function renderTabs() {
+    const tabBar = document.getElementById('tabBar');
+    if (!tabBar) return;
+
+    tabBar.innerHTML = tabs.map(t => `
+        <div class="tab-item ${t.id === activeTabId ? 'active' : ''}" onclick="switchTab(${t.id})">
+            <span>${t.title}</span>
+            <span class="tab-close" onclick="closeTab(${t.id}, event)">&times;</span>
+        </div>
+    `).join('');
+}
+
+// Format SQL không vỡ comment
 function formatSql() {
     if (!editor) return;
     const text = editor.getValue();
@@ -70,7 +200,6 @@ function formatSql() {
     const lines = text.split(/\r?\n/);
     const formattedLines = [];
     
-    // Danh sách các từ khóa SQL cần ngắt dòng & viết hoa
     const keywords = [
         "SELECT", "FROM", "WHERE", "AND", "OR", "GROUP BY", "ORDER BY",
         "HAVING", "LIMIT", "OFFSET", "JOIN", "LEFT JOIN", "RIGHT JOIN",
@@ -80,15 +209,13 @@ function formatSql() {
 
     for (let line of lines) {
         let trimmed = line.trim();
-        if (!trimmed) continue; // Bỏ qua dòng trống
+        if (!trimmed) continue;
 
-        // 1. Nếu dòng bắt đầu bằng dấu comment '--' -> Giữ nguyên toàn bộ dòng comment
         if (trimmed.startsWith('--')) {
             formattedLines.push(trimmed);
             continue;
         }
 
-        // 2. Tách phần Code và phần Comment ở cuối dòng (nếu có)
         let codePart = trimmed;
         let commentPart = '';
         const commentIdx = trimmed.indexOf('--');
@@ -99,20 +226,17 @@ function formatSql() {
         }
 
         if (codePart) {
-            // Ngắt dòng trước từ khóa nếu nhiều câu lệnh bị dính trên 1 dòng
             keywords.forEach(kw => {
                 const regex = new RegExp(`(?<!^)\\b${kw}\\b`, 'gi');
                 codePart = codePart.replace(regex, `\n${kw}`);
             });
 
-            // Viết hoa các từ khóa SQL
             keywords.forEach(kw => {
                 const regex = new RegExp(`\\b${kw}\\b`, 'gi');
                 codePart = codePart.replace(regex, kw);
             });
         }
 
-        // 3. Đưa các dòng đã format vào kết quả
         const fullLine = (codePart + commentPart).trim();
         if (fullLine) {
             const subLines = fullLine.split('\n');
@@ -125,7 +249,7 @@ function formatSql() {
     editor.setValue(formattedLines.join('\n'));
 }
 
-// Modal Controls - Bổ sung load Context Path
+// Modal Controls
 function openConfigModal() {
     document.getElementById('cfgHost').value = localStorage.getItem('maximo_host') || '';
     document.getElementById('cfgContext').value = localStorage.getItem('maximo_context') || 'maximo';
@@ -138,7 +262,6 @@ function closeConfigModal() {
     document.getElementById('configModal').style.display = 'none';
 }
 
-// Modal Controls - Bổ sung lưu Context Path
 function saveConfig() {
     const host = document.getElementById('cfgHost').value.trim();
     const context = (document.getElementById('cfgContext').value.trim() || 'maximo').replace(/^\/+|\/+$/g, '');
@@ -156,9 +279,10 @@ function saveConfig() {
     localStorage.setItem('maximo_pass', pass);
     alert('Đã lưu cấu hình kết nối thành công!');
     closeConfigModal();
+
+    loadDynamicSchema();
 }
 
-// Phân trang
 function changePage(delta) {
     const targetPage = currentPage + delta;
     if (targetPage >= 1) {
@@ -172,7 +296,7 @@ function updatePaginationButtons() {
     document.getElementById('btnNext').disabled = !hasMore;
 }
 
-// Thực thi SQL (Truyền header x-maximo-context)
+// Run Query
 async function runQuery(page = 1) {
     currentPage = page;
 
@@ -187,7 +311,6 @@ async function runQuery(page = 1) {
     msgBox.style.display = 'none';
     document.getElementById('filterInput').value = '';
 
-    // KIỂM TRA SAFE MODE TẠI CLIENT
     if (isSafeMode) {
         const cleanUpper = sql.toUpperCase().trim();
         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
@@ -196,12 +319,10 @@ async function runQuery(page = 1) {
         if (isForbidden) {
             msgBox.className = 'msg-box error';
             msgBox.style.display = 'block';
-            msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu! Hãy TẮT Safe Mode trên Toolbar nếu bạn muốn thực thi DML.';
+            msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu!';
             return;
         }
     }
-
-
 
     const host = localStorage.getItem('maximo_host');
     const context = localStorage.getItem('maximo_context') || 'maximo';
@@ -227,7 +348,7 @@ async function runQuery(page = 1) {
                 'x-maximo-context': context,
                 'x-maximo-username': user,
                 'x-maximo-password': pass,
-                'x-safe-mode': isSafeMode ? 'true' : 'false' // Truyền trạng thái lên Server
+                'x-safe-mode': isSafeMode ? 'true' : 'false'
             },
             body: JSON.stringify({ sql, page: currentPage })
         });
@@ -265,7 +386,7 @@ async function runQuery(page = 1) {
     }
 }
 
-// Lệnh COMMIT / ROLLBACK (Truyền header x-maximo-context)
+// Commit / Rollback Command
 async function executeCommand(cmd) {
     const msgBox = document.getElementById('msgBox');
     const resContainer = document.getElementById('resultsContainer');
@@ -313,7 +434,7 @@ async function executeCommand(cmd) {
     }
 }
 
-// Hiển thị kết quả & Lọc Dữ Liệu
+// Render Results
 function renderResults() {
     const resContainer = document.getElementById('resultsContainer');
     const keyword = document.getElementById('filterInput').value.trim().toLowerCase();
@@ -379,10 +500,34 @@ function exportExcel() {
     XLSX.writeFile(wb, `Maximo_Query_Page_${currentPage}.xlsx`);
 }
 
+// Chuyển Tab Sidebar
+function switchSidebarTab(tabName) {
+    const schemaTab = document.getElementById('sbTabSchema');
+    const historyTab = document.getElementById('sbTabHistory');
+    const schemaPanel = document.getElementById('panelSchema');
+    const historyPanel = document.getElementById('panelHistory');
+
+    if (!schemaTab || !historyTab || !schemaPanel || !historyPanel) return;
+
+    if (tabName === 'SCHEMA') {
+        schemaTab.classList.add('active');
+        historyTab.classList.remove('active');
+        schemaPanel.style.display = 'flex';
+        historyPanel.style.display = 'none';
+    } else if (tabName === 'HISTORY') {
+        historyTab.classList.add('active');
+        schemaTab.classList.remove('active');
+        historyPanel.style.display = 'flex';
+        schemaPanel.style.display = 'none';
+        renderHistory();
+    }
+}
+
+// Quản lý Lịch sử Query
 function addHistory(sql) {
     history = history.filter(h => h !== sql);
     history.unshift(sql);
-    if (history.length > 20) history.pop();
+    if (history.length > 30) history.pop();
     localStorage.setItem('maximo_sql_history', JSON.stringify(history));
     renderHistory();
 }
@@ -394,16 +539,26 @@ function loadHistory() {
 
 function renderHistory() {
     const list = document.getElementById('historyList');
+    if (!list) return;
+
     list.innerHTML = '';
-    if (history.length === 0) {
-        list.innerHTML = '<div style="font-size:12px; color:#888;">Chưa có lịch sử query.</div>';
+    
+    if (!history || history.length === 0) {
+        list.innerHTML = '<div style="font-size:12px; color:#888; padding: 10px;">Chưa có lịch sử query.</div>';
         return;
     }
+
     history.forEach(sql => {
         const item = document.createElement('div');
         item.className = 'history-item';
         item.innerText = sql;
-        item.onclick = () => editor.setValue(sql);
+        item.title = "Click để nạp câu lệnh vào Editor";
+        item.onclick = () => {
+            if (editor) {
+                editor.setValue(sql);
+                editor.focus();
+            }
+        };
         list.appendChild(item);
     });
 }
