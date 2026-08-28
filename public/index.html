@@ -19,82 +19,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/sql-hint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/comment/comment.min.js"></script>
-
 </head>
 <body>
 
     <!-- Header Navbar -->
     <div class="navbar">
-        <h1>MAXIMO SQL QUERY CONSOLE</h1>
+        <div class="nav-brand">
+            <h1>MAXIMO SQL QUERY CONSOLE</h1>
+        </div>
         <button class="btn-config" id="btn-config" onclick="openConfigModal()">⚙️ Cấu hình kết nối</button>
     </div>
 
     <!-- Main Console Layout -->
     <div class="container">
         <div class="main-panel">
+            <!-- Multi-tab bar -->
             <div class="tab-bar-container">
                 <div class="tab-bar" id="tabBar"></div>
                 <button class="btn-add-tab" onclick="addTab()" title="Mở Tab Mới">+</button>
             </div>
 
+            <!-- SQL Editor -->
             <div class="editor-container">
                 <textarea id="sqlEditor"></textarea>
             </div>
             
-
+            <!-- SQL Execution Toolbar -->
             <div class="toolbar">
-                <!-- Bổ sung vào nhóm .action-btns trong toolbar -->
-            <div class="action-btns">
-                <button class="btn btn-run" id="btn-execute" onclick="runQuery(1)">Chạy Query (Ctrl+Enter)</button>
-                <button class="btn btn-commit" id="btn-commit" onclick="executeCommand('COMMIT')">Commit</button>
-                <button class="btn btn-rollback" id="btn-rollback" onclick="executeCommand('ROLLBACK')">Rollback</button>
-                <button class="btn btn-format" id="btn-format" onclick="formatSql()">🧹 Format SQL</button>
-                <button class="btn btn-toggle" id="btn-toggle-view" onclick="toggleView()">Đổi View (Table/JSON)</button>
-                <button class="btn btn-fav" id="btn-fav" onclick="saveCurrentQueryToFavorites()" title="Lưu câu lệnh hiện tại vào danh sách Yêu thích">⭐ Lưu Query</button>
-                <!-- Công tắc Safe Mode -->
-                <label class="safe-mode-toggle" title="Khi BẬT, chặn tất cả câu lệnh UPDATE/DELETE/INSERT/DROP">
-                    <input type="checkbox" id="safeModeCheck" onchange="toggleSafeMode()" checked>
-                    <span class="slider"></span>
-                    <span class="label-text">🛡️ Safe Mode</span>
-                </label>
+                <div class="toolbar-group">
+                    <button class="btn btn-run" id="btn-execute" onclick="runQuery(1)" title="Thực thi SQL (Ctrl+Enter)">▶ Chạy</button>
+                    <button class="btn btn-commit" id="btn-commit" onclick="executeCommand('COMMIT')" title="Commit giao dịch">Commit</button>
+                    <button class="btn btn-rollback" id="btn-rollback" onclick="executeCommand('ROLLBACK')" title="Rollback giao dịch">Rollback</button>
+                </div>
 
-                <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Lọc kết quả real-time..." oninput="renderResults()" />
-            </div>
-                
-                <!-- Thanh Phân Trang & Xuất Excel -->
-                <div class="pagination-container">
-                    <button class="btn btn-nav" id="btnPrev" onclick="changePage(-1)" disabled>◄ Trước</button>
-                    <span id="pageLabel">Trang 1</span>
-                    <button class="btn btn-nav" id="btnNext" onclick="changePage(1)" disabled>Sau ►</button>
-                    <button class="btn btn-excel" id="btn-export" onclick="exportExcel()">Xuất Excel (.xlsx)</button>
+                <div class="toolbar-divider"></div>
+
+                <div class="toolbar-group">
+                    <button class="btn btn-format" id="btn-format" onclick="formatSql()" title="Định dạng SQL chuẩn">🧹 Format</button>
+                    <button class="btn btn-fav" id="btn-fav" onclick="saveCurrentQueryToFavorites()" title="Lưu Query yêu thích">⭐ Lưu</button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="toolbar-group">
+                    <label class="safe-mode-toggle" title="Chặn lệnh DML (UPDATE/DELETE)">
+                        <input type="checkbox" id="safeModeCheck" onchange="toggleSafeMode()" checked>
+                        <span class="slider"></span>
+                        <span class="label-text">🛡️ Safe Mode</span>
+                    </label>
+
+                    <div class="auto-limit-box" title="Giới hạn số bản ghi ROWNUM">
+                        <label class="auto-limit-toggle">
+                            <input type="checkbox" id="autoLimitCheck" checked>
+                            <span>⚡ Limit:</span>
+                        </label>
+                        <input type="number" id="autoLimitValue" class="auto-limit-input" value="200" min="1" max="100000" step="100" />
+                    </div>
                 </div>
             </div>
 
             <div id="msgBox" class="msg-box"></div>
 
-            <div id="resultsContainer" class="results-container">
-                <div id="placeholder-text">Nhập câu lệnh SQL và bấm "Chạy Query" để xem kết quả</div>
+            <!-- Results Panel (Controls moved to Header) -->
+            <div class="results-panel">
+                <div class="results-header">
+                    <div class="results-title">
+                        <span>📊 Kết quả truy vấn</span>
+                        <div id="queryStats" class="query-stats"></div>
+                    </div>
+                    
+                    <div class="results-actions">
+                        <button class="btn btn-toggle" id="btn-toggle-view" onclick="toggleView()" title="Đổi giao diện Bảng/JSON">👁️ View</button>
+                        <button class="btn btn-excel" id="btn-export" onclick="exportExcel()" title="Xuất tập tin Excel">📥 Excel</button>
+                        
+                        <div class="toolbar-divider"></div>
+                        
+                        <input type="text" id="filterInput" class="filter-input" placeholder="🔍 Lọc kết quả..." oninput="renderResults()" />
+                        
+                        <div class="pagination-widget">
+                            <button class="pg-btn" id="btnPrev" onclick="changePage(-1)" disabled title="Trang trước">‹</button>
+                            <span class="pg-label" id="pageLabel">Trang 1</span>
+                            <button class="pg-btn" id="btnNext" onclick="changePage(1)" disabled title="Trang sau">›</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="resultsContainer" class="results-container">
+                    <div id="placeholder-text">Nhập câu lệnh SQL và bấm "Chạy Query" để xem kết quả</div>
+                </div>
             </div>
         </div>
 
-        <!-- Sidebar Lịch sử Query -->
-        <div class="sidebar">
-            <!-- Thanh Tab Sidebar -->
-            <div class="sidebar-tabs">
-                <button class="sb-tab" id="sbTabFav" onclick="switchSidebarTab('FAV')">⭐ Yêu thích</button>
-                <button class="sb-tab active" id="sbTabSchema" onclick="switchSidebarTab('SCHEMA')">🗄️ CSDL (Schema)</button>
-                <button class="sb-tab" id="sbTabHistory" onclick="switchSidebarTab('HISTORY')">📜 Lịch sử</button>
+        <!-- Sidebar Lịch sử & CSDL -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-tabs">
+                    <button class="sb-tab active" id="sbTabSchema" onclick="switchSidebarTab('SCHEMA')" title="CSDL Schema">🗄️ <span class="tab-label">CSDL</span></button>
+                    <button class="sb-tab" id="sbTabHistory" onclick="switchSidebarTab('HISTORY')" title="Lịch sử Query">📜 <span class="tab-label">Lịch sử</span></button>
+                    <button class="sb-tab" id="sbTabFav" onclick="switchSidebarTab('FAV')" title="Yêu thích">⭐ <span class="tab-label">Yêu thích</span></button>
+                </div>
+                <button class="btn-toggle-sidebar" id="btnToggleSidebar" onclick="toggleSidebar()" title="Thu gọn / Mở rộng Sidebar">◄</button>
             </div>
              
-            
-            <!-- Panel 3: Query Yêu thích -->
-            <div id="panelFav" class="sidebar-panel" style="display: none;">
-                <div id="favList" class="history-list"></div>
-            </div>
-            
             <!-- Panel 1: Schema Browser -->
             <div id="panelSchema" class="sidebar-panel">
-                <input type="text" id="schemaSearchInput" class="filter-input" placeholder="🔍 Tìm bảng/cột Maximo..." oninput="filterSchemaTree()" style="width: 100%; margin-bottom: 8px;" />
+                <input type="text" id="schemaSearchInput" class="filter-input schema-filter" placeholder="🔍 Tìm bảng/cột Maximo..." oninput="filterSchemaTree()" />
                 <div id="schemaTreeList" class="schema-tree-list"></div>
             </div>
 
@@ -102,6 +131,26 @@
             <div id="panelHistory" class="sidebar-panel" style="display: none;">
                 <div id="historyList" class="history-list"></div>
             </div>
+
+            <!-- Panel 3: Query Yêu thích -->
+            <div id="panelFav" class="sidebar-panel" style="display: none;">
+                <div id="favList" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar Footer -->
+    <div class="statusbar">
+        <div class="status-item" id="statusConn">
+            <span class="status-dot disconnected" id="statusDot"></span>
+            <span id="statusHostText">Chưa kết nối Maximo</span>
+        </div>
+        <div class="status-item ml-auto">
+            <span id="statusContextText">Context: maximo</span>
+            <span class="status-divider">|</span>
+            <span id="statusLimitText">Limit: 200</span>
+            <span class="status-divider">|</span>
+            <span>UTF-8</span>
         </div>
     </div>
 

@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadHistory();
     loadDynamicSchema();
     loadFavorites();
+    updateStatusBar();
 });
 
 // Nạp Schema từ Maximo
@@ -282,7 +283,7 @@ function saveConfig() {
     localStorage.setItem('maximo_pass', pass);
     alert('Đã lưu cấu hình kết nối thành công!');
     closeConfigModal();
-
+    updateStatusBar();
     loadDynamicSchema();
 }
 
@@ -299,32 +300,132 @@ function updatePaginationButtons() {
     document.getElementById('btnNext').disabled = !hasMore;
 }
 
+// Run Query backup
+// async function runQuery(page = 1) {
+//     currentPage = page;
+
+//     const selectedSql = editor.getSelection().trim();
+//     const sql = selectedSql || editor.getValue().trim();
+//     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
+
+//     const msgBox = document.getElementById('msgBox');
+//     const resContainer = document.getElementById('resultsContainer');
+
+//     msgBox.className = 'msg-box';
+//     msgBox.style.display = 'none';
+//     document.getElementById('filterInput').value = '';
+
+//     if (isSafeMode) {
+//         const cleanUpper = sql.toUpperCase().trim();
+//         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
+//         const isForbidden = forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `));
+        
+//         if (isForbidden) {
+//             msgBox.className = 'msg-box error';
+//             msgBox.style.display = 'block';
+//             msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu!';
+//             return;
+//         }
+//     }
+
+//     const host = localStorage.getItem('maximo_host');
+//     const context = localStorage.getItem('maximo_context') || 'maximo';
+//     const user = localStorage.getItem('maximo_user');
+//     const pass = localStorage.getItem('maximo_pass');
+
+//     if (!host || !user || !pass) {
+//         openConfigModal();
+//         msgBox.className = 'msg-box error';
+//         msgBox.style.display = 'block';
+//         msgBox.innerText = 'Lỗi: Chưa cấu hình kết nối Maximo. Vui lòng nhập thông tin trong Popup.';
+//         return;
+//     }
+
+//     resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">Đang thực thi câu lệnh SQL...</div>`;
+
+//     try {
+//         const response = await fetch('/api/execute-sql', {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 'x-maximo-host': host,
+//                 'x-maximo-context': context,
+//                 'x-maximo-username': user,
+//                 'x-maximo-password': pass,
+//                 'x-safe-mode': isSafeMode ? 'true' : 'false'
+//             },
+//             body: JSON.stringify({ sql, page: currentPage })
+//         });
+
+//         const result = await response.json();
+
+//         if (!response.ok) {
+//             throw new Error(result.error || 'Lỗi không xác định từ Server');
+//         }
+
+//         addHistory(sql);
+
+//         if (result.action === 'SELECT') {
+//             currentData = result.data || [];
+//             hasMore = result.hasMore || false;
+//             updatePaginationButtons();
+//             renderResults();
+//         } else {
+//             currentData = [];
+//             filteredData = [];
+//             hasMore = false;
+//             updatePaginationButtons();
+//             resContainer.innerHTML = '';
+
+//             msgBox.className = 'msg-box success';
+//             msgBox.style.display = 'block';
+//             msgBox.innerText = result.message || 'Thực thi câu lệnh thành công!';
+//         }
+
+//     } catch (err) {
+//         resContainer.innerHTML = '';
+//         msgBox.className = 'msg-box error';
+//         msgBox.style.display = 'block';
+//         msgBox.innerText = 'Lỗi: ' + err.message;
+//     }
+// }
+
 // Run Query
 async function runQuery(page = 1) {
     currentPage = page;
 
     const selectedSql = editor.getSelection().trim();
-    const sql = selectedSql || editor.getValue().trim();
+    let sql = selectedSql || editor.getValue().trim();
     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
+    
+    // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
+    const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
+    const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
 
     const msgBox = document.getElementById('msgBox');
     const resContainer = document.getElementById('resultsContainer');
+    const statsBox = document.getElementById('queryStats');
 
     msgBox.className = 'msg-box';
     msgBox.style.display = 'none';
+    if (statsBox) statsBox.style.display = 'none';
     document.getElementById('filterInput').value = '';
 
+    // 1. Kiểm tra Safe Mode
     if (isSafeMode) {
         const cleanUpper = sql.toUpperCase().trim();
         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
-        const isForbidden = forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `));
-        
-        if (isForbidden) {
+        if (forbiddenWords.some(kw => cleanUpper.startsWith(kw) || cleanUpper.includes(` ${kw} `))) {
             msgBox.className = 'msg-box error';
             msgBox.style.display = 'block';
             msgBox.innerText = '🛡️ [SAFE MODE ACTIVE] Đã chặn câu lệnh làm thay đổi dữ liệu!';
             return;
         }
+    }
+
+    // 2. Áp dụng Auto Limit dựa trên tham số từ ô Input
+    if (isAutoLimit) {
+        sql = applyAutoLimit(sql, autoLimitVal);
     }
 
     const host = localStorage.getItem('maximo_host');
@@ -334,13 +435,12 @@ async function runQuery(page = 1) {
 
     if (!host || !user || !pass) {
         openConfigModal();
-        msgBox.className = 'msg-box error';
-        msgBox.style.display = 'block';
-        msgBox.innerText = 'Lỗi: Chưa cấu hình kết nối Maximo. Vui lòng nhập thông tin trong Popup.';
         return;
     }
 
-    resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">Đang thực thi câu lệnh SQL...</div>`;
+    resContainer.innerHTML = `<div style="color: #61dafb; text-align: center; margin-top: 50px;">⏳ Đang thực thi câu lệnh SQL...</div>`;
+
+    const startTime = performance.now();
 
     try {
         const response = await fetch('/api/execute-sql', {
@@ -356,6 +456,7 @@ async function runQuery(page = 1) {
             body: JSON.stringify({ sql, page: currentPage })
         });
 
+        const duration = Math.round(performance.now() - startTime);
         const result = await response.json();
 
         if (!response.ok) {
@@ -369,6 +470,11 @@ async function runQuery(page = 1) {
             hasMore = result.hasMore || false;
             updatePaginationButtons();
             renderResults();
+
+            if (statsBox) {
+                statsBox.style.display = 'block';
+                statsBox.innerText = `⚡ ${currentData.length} bản ghi | 🕒 ${duration} ms`;
+            }
         } else {
             currentData = [];
             filteredData = [];
@@ -378,7 +484,7 @@ async function runQuery(page = 1) {
 
             msgBox.className = 'msg-box success';
             msgBox.style.display = 'block';
-            msgBox.innerText = result.message || 'Thực thi câu lệnh thành công!';
+            msgBox.innerText = `${result.message || 'Thực thi thành công!'} (Thời gian: ${duration} ms)`;
         }
 
     } catch (err) {
@@ -388,6 +494,7 @@ async function runQuery(page = 1) {
         msgBox.innerText = 'Lỗi: ' + err.message;
     }
 }
+
 
 // Commit / Rollback Command
 async function executeCommand(cmd) {
@@ -437,6 +544,55 @@ async function executeCommand(cmd) {
     }
 }
 
+// Render Results backup
+// function renderResults() {
+//     const resContainer = document.getElementById('resultsContainer');
+//     const keyword = document.getElementById('filterInput').value.trim().toLowerCase();
+
+//     if (!currentData || currentData.length === 0) {
+//         resContainer.innerHTML = '<div style="color: #888; text-align: center; margin-top: 50px;">Không tìm thấy bản ghi phù hợp.</div>';
+//         return;
+//     }
+
+//     if (keyword) {
+//         filteredData = currentData.filter(row => {
+//             return Object.values(row).some(val => 
+//                 val !== null && val !== undefined && String(val).toLowerCase().includes(keyword)
+//             );
+//         });
+//     } else {
+//         filteredData = [...currentData];
+//     }
+
+//     if (filteredData.length === 0) {
+//         resContainer.innerHTML = `<div style="color: #f88080; text-align: center; margin-top: 50px;">Không tìm thấy kết quả phù hợp với từ khóa: "<b>${keyword}</b>"</div>`;
+//         return;
+//     }
+
+//     if (viewMode === 'JSON') {
+//         resContainer.innerHTML = `<pre style="color: #9cdcfe; font-size: 13px; margin: 0;">${JSON.stringify(filteredData, null, 2)}</pre>`;
+//         return;
+//     }
+
+//     const columns = Object.keys(filteredData[0]);
+//     let html = '<table><thead><tr><th class="stt-col">STT</th>';
+//     columns.forEach(col => html += `<th>${col}</th>`);
+//     html += '</tr></thead><tbody>';
+
+//     const startStt = (currentPage - 1) * 50;
+//     filteredData.forEach((row, idx) => {
+//         html += `<tr><td class="stt-col">${startStt + idx + 1}</td>`;
+//         columns.forEach(col => {
+//             const val = row[col];
+//             html += `<td>${val !== undefined && val !== null ? (typeof val === 'object' ? JSON.stringify(val) : val) : ''}</td>`;
+//         });
+//         html += '</tr>';
+//     });
+
+//     html += '</tbody></table>';
+//     resContainer.innerHTML = html;
+// }
+
 // Render Results
 function renderResults() {
     const resContainer = document.getElementById('resultsContainer');
@@ -477,7 +633,9 @@ function renderResults() {
         html += `<tr><td class="stt-col">${startStt + idx + 1}</td>`;
         columns.forEach(col => {
             const val = row[col];
-            html += `<td>${val !== undefined && val !== null ? (typeof val === 'object' ? JSON.stringify(val) : val) : ''}</td>`;
+            const displayVal = val !== undefined && val !== null ? (typeof val === 'object' ? JSON.stringify(val) : val) : '';
+            // Gán sự kiện nhấp đúp để chỉnh sửa trực tiếp
+            html += `<td title="Nhấp đúp chuột để chỉnh sửa giá trị này" ondblclick="makeCellEditable(this, ${idx}, '${col}')">${displayVal}</td>`;
         });
         html += '</tr>';
     });
@@ -485,6 +643,80 @@ function renderResults() {
     html += '</tbody></table>';
     resContainer.innerHTML = html;
 }
+// 2. Chuyển ô dữ liệu thành ô Input cho phép sửa
+function makeCellEditable(tdElement, rowIdx, colName) {
+    // Tránh việc kích hoạt lại khi ô đang ở trạng thái sửa
+    if (tdElement.querySelector('input')) return;
+
+    const oldValue = filteredData[rowIdx][colName] !== undefined && filteredData[rowIdx][colName] !== null 
+        ? String(filteredData[rowIdx][colName]) 
+        : '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'inline-edit-input';
+    input.value = oldValue;
+
+    tdElement.innerHTML = '';
+    tdElement.appendChild(input);
+    input.focus();
+    input.select();
+
+    // Xử lý khi nhấn Enter (Xác nhận) hoặc Escape (Hủy)
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            finishCellEditing(tdElement, rowIdx, colName, input.value.trim(), oldValue);
+        } else if (e.key === 'Escape') {
+            tdElement.innerHTML = oldValue;
+        }
+    });
+
+    // Tự động xác nhận khi click ra ngoài (Blur)
+    input.addEventListener('blur', () => {
+        finishCellEditing(tdElement, rowIdx, colName, input.value.trim(), oldValue);
+    });
+}
+
+// 3. Hoàn tất chỉnh sửa và tự động sinh câu lệnh UPDATE
+function finishCellEditing(tdElement, rowIdx, colName, newValue, oldValue) {
+    tdElement.innerHTML = newValue;
+
+    // Nếu giá trị không thay đổi thì bỏ qua
+    if (newValue === oldValue) return;
+
+    // Cập nhật giá trị mới vào mảng dữ liệu tạm thời
+    filteredData[rowIdx][colName] = newValue;
+
+    // Lấy tên bảng từ câu lệnh SELECT hiện tại
+    const currentSql = editor.getValue();
+    const fromMatch = currentSql.match(/FROM\s+([a-zA-Z0-9_]+)/i);
+    const tableName = fromMatch && fromMatch[1] ? fromMatch[1].toLowerCase() : 'workorder';
+
+    // Tạo mệnh đề WHERE từ tất cả các cột khóa của dòng hiện tại
+    const rowData = filteredData[rowIdx];
+    const whereConditions = [];
+
+    Object.keys(rowData).forEach(key => {
+        // Bỏ qua cột vừa sửa ra khỏi điều kiện WHERE
+        if (key !== colName && rowData[key] !== null && rowData[key] !== undefined && rowData[key] !== '') {
+            const val = String(rowData[key]).replace(/'/g, "''"); // Escape dấu nháy đơn
+            whereConditions.push(`${key} = '${val}'`);
+        }
+    });
+
+    // Ghép câu lệnh UPDATE hoàn chỉnh
+    const updateSql = `UPDATE ${tableName}\nSET ${colName} = '${newValue.replace(/'/g, "''")}'\nWHERE ${whereConditions.join('\n  AND ')}`;
+
+    // Tự động thêm Tab mới hoặc cập nhật câu lệnh vào Editor để người dùng kiểm tra
+    addTab(updateSql);
+
+    // Hiển thị thông báo hướng dẫn
+    const msgBox = document.getElementById('msgBox');
+    msgBox.className = 'msg-box success';
+    msgBox.style.display = 'block';
+    msgBox.innerText = `✏️ Đã sinh câu lệnh UPDATE cho cột [${colName.toUpperCase()}]. Hãy kiểm tra lại và bấm "Chạy Query" để thực thi.`;
+}
+
 
 function toggleView() {
     viewMode = viewMode === 'TABLE' ? 'JSON' : 'TABLE';
@@ -505,6 +737,13 @@ function exportExcel() {
 
 // Chuyển Tab Sidebar
 function switchSidebarTab(tabName) {
+    const sidebar = document.getElementById('sidebar');
+    
+    // Nếu Sidebar đang ở trạng thái Thu gọn -> Tự động mở rộng ra
+    if (sidebar && sidebar.classList.contains('collapsed')) {
+        toggleSidebar();
+    }
+
     const schemaTab = document.getElementById('sbTabSchema');
     const historyTab = document.getElementById('sbTabHistory');
     const favTab = document.getElementById('sbTabFav');
@@ -641,4 +880,73 @@ function renderFavorites() {
 
         list.appendChild(item);
     });
+}
+
+
+// Hàm tự động thêm ROWNUM theo tham số tùy chỉnh
+function applyAutoLimit(sql, limitValue = 200) {
+    const cleanSql = sql.trim();
+    const upper = cleanSql.toUpperCase();
+    const limit = parseInt(limitValue) || 200; // Mặc định là 200 nếu nhập sai
+
+    // Chỉ áp dụng cho câu lệnh SELECT/WITH và chưa khai báo ROWNUM/FETCH FIRST/TOP
+    if ((upper.startsWith("SELECT") || upper.startsWith("WITH")) && 
+        !upper.includes("ROWNUM") && 
+        !upper.includes("FETCH FIRST") && 
+        !upper.includes("TOP ")) {
+
+        if (upper.includes("WHERE")) {
+            return `${cleanSql} AND ROWNUM <= ${limit}`;
+        } else if (upper.includes("ORDER BY")) {
+            const orderByIdx = upper.lastIndexOf("ORDER BY");
+            const mainQuery = cleanSql.substring(0, orderByIdx).trim();
+            const orderByClause = cleanSql.substring(orderByIdx);
+            return `${mainQuery} WHERE ROWNUM <= ${limit} ${orderByClause}`;
+        } else {
+            return `${cleanSql} WHERE ROWNUM <= ${limit}`;
+        }
+    }
+    return cleanSql;
+}
+
+
+// Hàm thu gọn / Mở rộng Sidebar
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('btnToggleSidebar');
+    if (!sidebar || !toggleBtn) return;
+
+    sidebar.classList.toggle('collapsed');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    
+    // Đổi icon mũi tên
+    toggleBtn.innerText = isCollapsed ? '►' : '◄';
+
+    // Refresh lại CodeMirror IDE để tự giãn chiều rộng
+    setTimeout(() => {
+        if (editor) editor.refresh();
+    }, 200);
+}
+
+// Hàm cập nhật Thanh Trạng Thái (Status Bar Footer)
+function updateStatusBar() {
+    const host = localStorage.getItem('maximo_host');
+    const context = localStorage.getItem('maximo_context') || 'maximo';
+    const limitVal = document.getElementById('autoLimitValue')?.value || '200';
+
+    const statusDot = document.getElementById('statusDot');
+    const statusHostText = document.getElementById('statusHostText');
+    const statusContextText = document.getElementById('statusContextText');
+    const statusLimitText = document.getElementById('statusLimitText');
+
+    if (host) {
+        if (statusDot) statusDot.className = 'status-dot connected';
+        if (statusHostText) statusHostText.innerText = ` ${host}`;
+    } else {
+        if (statusDot) statusDot.className = 'status-dot disconnected';
+        if (statusHostText) statusHostText.innerText = 'Chưa kết nối Maximo';
+    }
+
+    if (statusContextText) statusContextText.innerText = `Context: /${context}`;
+    if (statusLimitText) statusLimitText.innerText = `Limit: ${limitVal}`;
 }
