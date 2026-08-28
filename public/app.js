@@ -15,6 +15,8 @@ let MAXIMO_SCHEMA = {};
 
 let favorites = [];
 
+let lastExecutedSql = ''; // Lưu câu SQL vừa thực thi thành công
+
 document.addEventListener('DOMContentLoaded', () => {
     // Khởi tạo CodeMirror IDE
     editor = CodeMirror.fromTextArea(document.getElementById('sqlEditor'), {
@@ -308,18 +310,114 @@ function updatePaginationButtons() {
     document.getElementById('btnNext').disabled = !hasMore;
 }
 
-// Run Query backup
+
+
+// 1. Tự động loại bỏ Comment ở đầu câu lệnh & Dấu ';' thừa ở cuối
+function cleanSqlStatement(sql) {
+    if (!sql) return '';
+    let cleaned = sql.trim();
+
+    // Xóa dấu ';' ở cuối câu lệnh
+    cleaned = cleaned.replace(/;+$/, '').trim();
+
+    // Xóa comment nằm ở đầu câu lệnh để Backend & Maximo nhận diện đúng từ khóa SELECT/WITH
+    while (true) {
+        if (cleaned.startsWith('/*')) {
+            const endIdx = cleaned.indexOf('*/');
+            if (endIdx !== -1) {
+                cleaned = cleaned.substring(endIdx + 2).trim();
+                continue;
+            }
+        }
+        if (cleaned.startsWith('--')) {
+            const endLine = cleaned.indexOf('\n');
+            if (endLine !== -1) {
+                cleaned = cleaned.substring(endLine + 1).trim();
+                continue;
+            } else {
+                cleaned = '';
+            }
+        }
+        break;
+    }
+
+    return cleaned;
+}
+
+// 2. Tự động xác định câu lệnh chứa con trỏ (Bỏ qua dấu ';' nằm trong Comment và Nháy đơn)
+function getCurrentStatementAtCursor(cm) {
+    if (!cm) return '';
+
+    const selectedText = cm.getSelection().trim();
+    if (selectedText) return selectedText;
+
+    const fullText = cm.getValue();
+    if (!fullText.trim()) return '';
+
+    const cursorPos = cm.getCursor();
+    const cursorIndex = cm.indexFromPos(cursorPos);
+
+    // Phân tích cú pháp để tìm các dấu ';' hợp lệ (không nằm trong comment hay chuỗi '...')
+    let inString = false;
+    let inSingleComment = false;
+    let inMultiComment = false;
+    const semicolonIndices = [];
+
+    for (let i = 0; i < fullText.length; i++) {
+        const char = fullText[i];
+        const nextChar = fullText[i + 1];
+
+        if (inSingleComment) {
+            if (char === '\n') inSingleComment = false;
+            continue;
+        }
+        if (inMultiComment) {
+            if (char === '*' && nextChar === '/') {
+                inMultiComment = false;
+                i++;
+            }
+            continue;
+        }
+        if (inString) {
+            if (char === "'") {
+                if (nextChar === "'") i++; // Bỏ qua nháy đơn thoát ''
+                else inString = false;
+            }
+            continue;
+        }
+
+        if (char === '-' && nextChar === '-') { inSingleComment = true; i++; continue; }
+        if (char === '/' && nextChar === '*') { inMultiComment = true; i++; continue; }
+        if (char === "'") { inString = true; continue; }
+
+        if (char === ';') semicolonIndices.push(i);
+    }
+
+    // Tìm phạm vi câu lệnh chứa con trỏ hiện tại
+    let lastSemi = -1;
+    let nextSemi = fullText.length;
+
+    for (const idx of semicolonIndices) {
+        if (idx < cursorIndex) lastSemi = idx;
+        else { nextSemi = idx; break; }
+    }
+
+    let currentSql = fullText.substring(lastSemi + 1, nextSemi).trim();
+
+    if (!currentSql && lastSemi > 0) {
+        let prevSemi = -1;
+        for (const idx of semicolonIndices) {
+            if (idx < lastSemi) prevSemi = idx;
+            else break;
+        }
+        currentSql = fullText.substring(prevSemi + 1, lastSemi).trim();
+    }
+
+    return currentSql;
+}
+// backup Run Query
 // async function runQuery(page = 1) {
 //     currentPage = page;
-    
-
-//     const selectedSql = editor.getSelection().trim();
-//     let sql = selectedSql || editor.getValue().trim();
-//     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
-    
-//     // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
-//     const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
-//     const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
 
 //     const msgBox = document.getElementById('msgBox');
 //     const resContainer = document.getElementById('resultsContainer');
@@ -330,7 +428,26 @@ function updatePaginationButtons() {
 //     if (statsBox) statsBox.style.display = 'none';
 //     document.getElementById('filterInput').value = '';
 
-//     // 1. Kiểm tra Safe Mode
+//     // 1. Lấy câu lệnh SQL tại vị trí con trỏ (hoặc đoạn bôi đen)
+//     let sql = getCurrentStatementAtCursor(editor);
+
+//     if (!sql) {
+//         msgBox.className = 'msg-box error';
+//         msgBox.style.display = 'block';
+//         msgBox.innerText = '⚠️ Không tìm thấy câu lệnh SQL tại vị trí con trỏ!';
+//         return;
+//     }
+
+//     // Tự động xóa dấu ';' thừa ở cuối câu lệnh để tránh lỗi cú pháp CSDL
+//     sql = sql.replace(/;+$/, '').trim();
+
+//     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
+    
+//     // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
+//     const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
+//     const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
+
+//     // 2. Kiểm tra Safe Mode
 //     if (isSafeMode) {
 //         const cleanUpper = sql.toUpperCase().trim();
 //         const forbiddenWords = ['UPDATE', 'DELETE', 'INSERT', 'DROP', 'ALTER', 'TRUNCATE'];
@@ -342,7 +459,7 @@ function updatePaginationButtons() {
 //         }
 //     }
 
-//     // 2. Áp dụng Auto Limit dựa trên tham số từ ô Input
+//     // 3. Áp dụng Auto Limit dựa trên tham số từ ô Input
 //     if (isAutoLimit) {
 //         sql = applyAutoLimit(sql, autoLimitVal);
 //     }
@@ -414,7 +531,7 @@ function updatePaginationButtons() {
 //     }
 // }
 
-// Run Query
+//run Query
 async function runQuery(page = 1) {
     currentPage = page;
 
@@ -427,22 +544,18 @@ async function runQuery(page = 1) {
     if (statsBox) statsBox.style.display = 'none';
     document.getElementById('filterInput').value = '';
 
-    // 1. Lấy câu lệnh SQL tại vị trí con trỏ (hoặc đoạn bôi đen)
-    let sql = getCurrentStatementAtCursor(editor);
+    // 1. Trích xuất câu lệnh tại con trỏ và làm sạch comment đầu câu
+    const rawSql = getCurrentStatementAtCursor(editor);
+    let sql = cleanSqlStatement(rawSql);
 
     if (!sql) {
         msgBox.className = 'msg-box error';
         msgBox.style.display = 'block';
-        msgBox.innerText = '⚠️ Không tìm thấy câu lệnh SQL tại vị trí con trỏ!';
+        msgBox.innerText = '⚠️ Không tìm thấy câu lệnh SQL hợp lệ tại vị trí con trỏ!';
         return;
     }
 
-    // Tự động xóa dấu ';' thừa ở cuối câu lệnh để tránh lỗi cú pháp CSDL
-    sql = sql.replace(/;+$/, '').trim();
-
     const isSafeMode = document.getElementById('safeModeCheck')?.checked ?? true;
-    
-    // Đọc trạng thái Bật/Tắt và Giá trị tham số số dòng từ ô Input
     const isAutoLimit = document.getElementById('autoLimitCheck')?.checked ?? true;
     const autoLimitVal = parseInt(document.getElementById('autoLimitValue')?.value) || 1000;
 
@@ -577,6 +690,7 @@ async function executeCommand(cmd) {
         msgBox.style.display = 'block';
         msgBox.innerText = 'Lỗi: ' + err.message;
     }
+    lastExecutedSql = sql;
 }
 
 // Render Results backup
@@ -758,16 +872,43 @@ function toggleView() {
     renderResults();
 }
 
+// Xuất Excel đa Sheet (Sheet 1: Dữ liệu | Sheet 2: SQL Query & Metadata)
 function exportExcel() {
     const dataToExport = filteredData.length > 0 ? filteredData : currentData;
     if (!dataToExport || dataToExport.length === 0) {
         alert('Không có dữ liệu để xuất Excel!');
         return;
     }
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Maximo_Data");
-    XLSX.writeFile(wb, `Maximo_Query_Page_${currentPage}.xlsx`);
+
+    // 1. Tạo Sheet 1: Dữ liệu kết quả truy vấn
+    const wsData = XLSX.utils.json_to_sheet(dataToExport);
+    XLSX.utils.book_append_sheet(wb, wsData, "Data");
+
+    // 2. Tạo Sheet 2: Lưu câu lệnh SQL và thông tin lịch sử xuất
+    const sqlText = lastExecutedSql || getCurrentStatementAtCursor(editor) || editor.getValue();
+    const queryMeta = [
+        { "Thông số": "Thời gian xuất", "Nội dung": new Date().toLocaleString('vi-VN') },
+        { "Thông số": "Trang hiện tại", "Nội dung": currentPage },
+        { "Thông số": "Số bản ghi xuất", "Nội dung": dataToExport.length },
+        { "Thông số": "Môi trường Host", "Nội dung": localStorage.getItem('maximo_host') || 'N/A' },
+        { "Thông số": "Câu lệnh SQL", "Nội dung": sqlText }
+    ];
+
+    const wsQuery = XLSX.utils.json_to_sheet(queryMeta);
+
+    // Chỉnh độ rộng cột Sheet 2 giúp hiển thị câu SQL dài dễ đọc hơn
+    wsQuery['!cols'] = [
+        { wch: 20 }, // Độ rộng cột Thông số
+        { wch: 120 } // Độ rộng cột Nội dung SQL
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsQuery, "SQL_Info");
+
+    // 3. Tiến hành xuất tập tin Excel (.xlsx)
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Maximo_Export_${dateStr}_Page${currentPage}.xlsx`);
 }
 
 // Chuyển Tab Sidebar
@@ -919,28 +1060,60 @@ function renderFavorites() {
 
 
 // Hàm tự động thêm ROWNUM theo tham số tùy chỉnh
+// Hàm tự động thêm ROWNUM thông minh (Xử lý chuẩn ngoặc lồng (), CTE, Subquery & ORDER BY)
 function applyAutoLimit(sql, limitValue = 200) {
-    const cleanSql = sql.trim();
-    const upper = cleanSql.toUpperCase();
-    const limit = parseInt(limitValue) || 200; // Mặc định là 200 nếu nhập sai
+    let cleanSql = sql.trim().replace(/;+$/, '');
+    const limit = parseInt(limitValue) || 200;
 
-    // Chỉ áp dụng cho câu lệnh SELECT/WITH và chưa khai báo ROWNUM/FETCH FIRST/TOP
-    if ((upper.startsWith("SELECT") || upper.startsWith("WITH")) && 
-        !upper.includes("ROWNUM") && 
-        !upper.includes("FETCH FIRST") && 
-        !upper.includes("TOP ")) {
+    // 1. Loại bỏ comment để kiểm tra từ khóa khởi đầu
+    const codeOnly = cleanSql
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/--.*$/gm, '')
+        .trim();
 
-        if (upper.includes("WHERE")) {
-            return `${cleanSql} AND ROWNUM <= ${limit}`;
-        } else if (upper.includes("ORDER BY")) {
-            const orderByIdx = upper.lastIndexOf("ORDER BY");
-            const mainQuery = cleanSql.substring(0, orderByIdx).trim();
-            const orderByClause = cleanSql.substring(orderByIdx);
-            return `${mainQuery} WHERE ROWNUM <= ${limit} ${orderByClause}`;
-        } else {
-            return `${cleanSql} WHERE ROWNUM <= ${limit}`;
+    const upperCode = codeOnly.toUpperCase();
+
+    // 2. Kiểm tra nếu là câu lệnh SELECT/WITH chưa có điều kiện giới hạn
+    if ((upperCode.startsWith("SELECT") || upperCode.startsWith("WITH")) && 
+        !upperCode.includes("ROWNUM") && 
+        !upperCode.includes("FETCH FIRST") && 
+        !upperCode.includes("TOP ")) {
+
+        let mainPart = cleanSql;
+        let orderByClause = "";
+
+        // Tách mệnh đề ORDER BY ở cuối (nếu có)
+        const upperClean = cleanSql.toUpperCase();
+        const orderByIdx = upperClean.lastIndexOf("ORDER BY");
+        
+        if (orderByIdx !== -1) {
+            mainPart = cleanSql.substring(0, orderByIdx).trim();
+            orderByClause = " " + cleanSql.substring(orderByIdx).trim();
         }
+
+        // 3. Bóc tách triệt để toàn bộ khối ngoặc lồng (...) để lấy khung SQL ngoài cùng
+        let skeleton = mainPart
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/--.*$/gm, '');
+
+        let prevSkeleton;
+        do {
+            prevSkeleton = skeleton;
+            skeleton = skeleton.replace(/\([^()]*\)/g, '');
+        } while (skeleton !== prevSkeleton);
+
+        // 4. Kiểm tra từ khóa WHERE trên khung SQL ngoài cùng
+        const hasOuterWhere = skeleton.toUpperCase().includes("WHERE");
+
+        if (hasOuterWhere) {
+            mainPart += ` AND ROWNUM <= ${limit}`;
+        } else {
+            mainPart += ` WHERE ROWNUM <= ${limit}`;
+        }
+
+        return mainPart + orderByClause;
     }
+
     return cleanSql;
 }
 
@@ -1000,31 +1173,31 @@ function updateStatusBar() {
 }
 
 // Tự động trích xuất câu lệnh SQL tại vị trí con trỏ chuột
-function getCurrentStatementAtCursor(cm) {
-    if (!cm) return '';
+// function getCurrentStatementAtCursor(cm) {
+//     if (!cm) return '';
 
-    // 1. Ưu tiên hàng đầu: Nếu người dùng đã chủ động bôi đen -> Lấy đoạn bôi đen
-    const selectedText = cm.getSelection().trim();
-    if (selectedText) return selectedText;
+//     // 1. Ưu tiên hàng đầu: Nếu người dùng đã chủ động bôi đen -> Lấy đoạn bôi đen
+//     const selectedText = cm.getSelection().trim();
+//     if (selectedText) return selectedText;
 
-    const fullText = cm.getValue();
-    if (!fullText.trim()) return '';
+//     const fullText = cm.getValue();
+//     if (!fullText.trim()) return '';
 
-    // 2. Chuyển vị trí dòng/cột (line/ch) của con trỏ thành Index chuỗi
-    const cursorPos = cm.getCursor();
-    const cursorIndex = cm.indexFromPos(cursorPos);
+//     // 2. Chuyển vị trí dòng/cột (line/ch) của con trỏ thành Index chuỗi
+//     const cursorPos = cm.getCursor();
+//     const cursorIndex = cm.indexFromPos(cursorPos);
 
-    // 3. Tìm dấu ';' gần nhất PHÍA TRƯỚC và PHÍA SAU con trỏ
-    const lastSemicolon = fullText.lastIndexOf(';', cursorIndex - 1);
-    let nextSemicolon = fullText.indexOf(';', cursorIndex);
+//     // 3. Tìm dấu ';' gần nhất PHÍA TRƯỚC và PHÍA SAU con trỏ
+//     const lastSemicolon = fullText.lastIndexOf(';', cursorIndex - 1);
+//     let nextSemicolon = fullText.indexOf(';', cursorIndex);
 
-    if (nextSemicolon === -1) {
-        nextSemicolon = fullText.length;
-    }
+//     if (nextSemicolon === -1) {
+//         nextSemicolon = fullText.length;
+//     }
 
-    // 4. Cắt chuỗi nằm giữa 2 dấu ';'
-    const startIndex = (lastSemicolon === -1) ? 0 : lastSemicolon + 1;
-    const currentSql = fullText.substring(startIndex, nextSemicolon).trim();
+//     // 4. Cắt chuỗi nằm giữa 2 dấu ';'
+//     const startIndex = (lastSemicolon === -1) ? 0 : lastSemicolon + 1;
+//     const currentSql = fullText.substring(startIndex, nextSemicolon).trim();
 
-    return currentSql;
-}
+//     return currentSql;
+// }
