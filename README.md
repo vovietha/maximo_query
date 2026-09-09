@@ -2,6 +2,14 @@
 
 Đoạn script Jython dưới đây chạy trực tiếp trên Maximo Automation Script (không cần Launch Point) để nhận câu lệnh SQL từ Web Console, thực thi trực tiếp xuống CSDL Oracle/DB2/SQL Server và trả về kết quả dạng JSON.
 
+Module: System Configuration ➔ Platform Configuration ➔ Automation Scripts
+
+Action: Select Action ➔ Create ➔ Script (Tạo Script không cần Launch Point)
+
+Script Name: EXEC_SQL
+
+Script Language: jython
+
 ```python
 from psdi.server import MXServer
 import java.sql.Types as Types
