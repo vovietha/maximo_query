@@ -690,7 +690,7 @@ async function executeCommand(cmd) {
         msgBox.style.display = 'block';
         msgBox.innerText = 'Lỗi: ' + err.message;
     }
-    lastExecutedSql = sql;
+    lastExecutedSql = cmd;
 }
 
 // Render Results backup
@@ -1061,11 +1061,15 @@ function renderFavorites() {
 
 // Hàm tự động thêm ROWNUM theo tham số tùy chỉnh
 // Hàm tự động thêm ROWNUM thông minh (Xử lý chuẩn ngoặc lồng (), CTE, Subquery & ORDER BY)
+// Hàm tự động thêm ROWNUM an toàn (Chuẩn hóa cho Oracle DB, bảo toàn ORDER BY & CTE)
 function applyAutoLimit(sql, limitValue = 200) {
+    if (!sql) return '';
+
+    // 1. Dọn dẹp khoảng trắng và loại bỏ các dấu ';' thừa ở cuối câu
     let cleanSql = sql.trim().replace(/;+$/, '');
     const limit = parseInt(limitValue) || 200;
 
-    // 1. Loại bỏ comment để kiểm tra từ khóa khởi đầu
+    // 2. Loại bỏ tạm thời Comment để kiểm tra chính xác từ khóa khởi đầu
     const codeOnly = cleanSql
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/--.*$/gm, '')
@@ -1073,45 +1077,18 @@ function applyAutoLimit(sql, limitValue = 200) {
 
     const upperCode = codeOnly.toUpperCase();
 
-    // 2. Kiểm tra nếu là câu lệnh SELECT/WITH chưa có điều kiện giới hạn
-    if ((upperCode.startsWith("SELECT") || upperCode.startsWith("WITH")) && 
-        !upperCode.includes("ROWNUM") && 
-        !upperCode.includes("FETCH FIRST") && 
-        !upperCode.includes("TOP ")) {
+    // 3. Kiểm tra xem có phải câu lệnh SELECT hoặc WITH (CTE) chưa có điều kiện giới hạn
+    const isSelectOrWith = upperCode.startsWith("SELECT") || upperCode.startsWith("WITH");
+    const hasLimitAlready = upperCode.includes("ROWNUM") || 
+                            upperCode.includes("FETCH FIRST") || 
+                            upperCode.includes("TOP ");
 
-        let mainPart = cleanSql;
-        let orderByClause = "";
-
-        // Tách mệnh đề ORDER BY ở cuối (nếu có)
-        const upperClean = cleanSql.toUpperCase();
-        const orderByIdx = upperClean.lastIndexOf("ORDER BY");
-        
-        if (orderByIdx !== -1) {
-            mainPart = cleanSql.substring(0, orderByIdx).trim();
-            orderByClause = " " + cleanSql.substring(orderByIdx).trim();
-        }
-
-        // 3. Bóc tách triệt để toàn bộ khối ngoặc lồng (...) để lấy khung SQL ngoài cùng
-        let skeleton = mainPart
-            .replace(/\/\*[\s\S]*?\*\//g, '')
-            .replace(/--.*$/gm, '');
-
-        let prevSkeleton;
-        do {
-            prevSkeleton = skeleton;
-            skeleton = skeleton.replace(/\([^()]*\)/g, '');
-        } while (skeleton !== prevSkeleton);
-
-        // 4. Kiểm tra từ khóa WHERE trên khung SQL ngoài cùng
-        const hasOuterWhere = skeleton.toUpperCase().includes("WHERE");
-
-        if (hasOuterWhere) {
-            mainPart += ` AND ROWNUM <= ${limit}`;
-        } else {
-            mainPart += ` WHERE ROWNUM <= ${limit}`;
-        }
-
-        return mainPart + orderByClause;
+    if (isSelectOrWith && !hasLimitAlready) {
+        // Bọc toàn bộ câu SQL gốc vào trong 1 Subquery ngoài cùng.
+        // Giải pháp này đảm bảo:
+        // - Lọc đúng top 200 bản ghi SAU KHI đã ORDER BY.
+        // - Không bao giờ bị vỡ cú pháp do ngoặc lồng (), Subquery hay chuỗi String.
+        return `SELECT * FROM (\n  ${cleanSql}\n) WHERE ROWNUM <= ${limit}`;
     }
 
     return cleanSql;
