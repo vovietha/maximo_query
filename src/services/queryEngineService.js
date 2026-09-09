@@ -1,5 +1,10 @@
-//cach 3
 const axios = require('axios');
+
+const response = await axios.post(url, paginatedSql, {
+    headers: { 'MAXAUTH': maxauth, 'Content-Type': 'text/plain' },
+    timeout: 30000,
+    maxContentLength: 10 * 1024 * 1024 // Giới hạn Response tối đa 10MB (Tránh Tràn RAM)
+});
 
 /**
  * Thực thi SQL với cấu hình bắt buộc từ giao diện UI
