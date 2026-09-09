@@ -8,14 +8,14 @@
 from psdi.server import MXServer
 import java.sql.Types as Types
 
-# Hàm escape ký tự đặc biệt cho chuỗi JSON
+    # Hàm escape ký tự đặc biệt cho chuỗi JSON
 def escape_str(s):
     if s is None:
         return u""
     u_str = unicode(s)
     return u_str.replace(u'\\', u'\\\\').replace(u'"', u'\\"').replace(u'\n', u'\\n').replace(u'\r', u'\\r')
 
-# Hàm xử lý giá trị các kiểu dữ liệu cột
+    # Hàm xử lý giá trị các kiểu dữ liệu cột
 def get_column_value(rs, md, col_idx):
     col_type = md.getColumnType(col_idx)
     # Xu ly cot BLOB va Binary Data
@@ -42,7 +42,7 @@ def get_column_value(rs, md, col_idx):
             except:
                 return u"<DATA>"
 
-# Lấy dữ liệu SQL từ HTTP Request
+    # Lấy dữ liệu SQL từ HTTP Request
 sql = requestBody if 'requestBody' in globals() and requestBody else ""
 
 if not sql or sql.strip() == "":
