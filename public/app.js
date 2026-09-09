@@ -827,6 +827,7 @@ function makeCellEditable(tdElement, rowIdx, colName) {
 }
 
 // 3. Hoàn tất chỉnh sửa và tự động sinh câu lệnh UPDATE
+// Hoàn tất chỉnh sửa ô và tự động sinh câu lệnh UPDATE thông minh
 function finishCellEditing(tdElement, rowIdx, colName, newValue, oldValue) {
     tdElement.innerHTML = newValue;
 
@@ -841,29 +842,44 @@ function finishCellEditing(tdElement, rowIdx, colName, newValue, oldValue) {
     const fromMatch = currentSql.match(/FROM\s+([a-zA-Z0-9_]+)/i);
     const tableName = fromMatch && fromMatch[1] ? fromMatch[1].toLowerCase() : 'workorder';
 
-    // Tạo mệnh đề WHERE từ tất cả các cột khóa của dòng hiện tại
     const rowData = filteredData[rowIdx];
+    const rowKeys = Object.keys(rowData);
     const whereConditions = [];
 
-    Object.keys(rowData).forEach(key => {
-        // Bỏ qua cột vừa sửa ra khỏi điều kiện WHERE
-        if (key !== colName && rowData[key] !== null && rowData[key] !== undefined && rowData[key] !== '') {
-            const val = String(rowData[key]).replace(/'/g, "''"); // Escape dấu nháy đơn
-            whereConditions.push(`${key} = '${val}'`);
-        }
+    // 1. Tìm cột Primary Key chuẩn của Maximo (VD: WORKORDERID, ASSETID, LOCATIONID, LABTRANSID...)
+    const expectedPkName = `${tableName}id`.toUpperCase();
+    const primaryKeyCol = rowKeys.find(key => {
+        const upperKey = key.toUpperCase();
+        return upperKey === expectedPkName || upperKey === 'ID' || upperKey === `${tableName}_ID`.toUpperCase();
     });
+
+    // 2. Nếu tìm thấy Primary Key và có giá trị hợp lệ -> Dùng duy nhất Primary Key cho WHERE
+    if (primaryKeyCol && rowData[primaryKeyCol] !== null && rowData[primaryKeyCol] !== undefined && rowData[primaryKeyCol] !== '') {
+        const pkVal = String(rowData[primaryKeyCol]).replace(/'/g, "''");
+        whereConditions.push(`${primaryKeyCol} = '${pkVal}'`);
+    } else {
+        // 3. Phương án dự phòng: Nếu không có PK (do SELECT không lấy cột ID), ghép các cột còn lại ngoại trừ cột vừa sửa
+        rowKeys.forEach(key => {
+            if (key !== colName && rowData[key] !== null && rowData[key] !== undefined && rowData[key] !== '') {
+                const val = String(rowData[key]).replace(/'/g, "''");
+                whereConditions.push(`${key} = '${val}'`);
+            }
+        });
+    }
 
     // Ghép câu lệnh UPDATE hoàn chỉnh
     const updateSql = `UPDATE ${tableName}\nSET ${colName} = '${newValue.replace(/'/g, "''")}'\nWHERE ${whereConditions.join('\n  AND ')}`;
 
-    // Tự động thêm Tab mới hoặc cập nhật câu lệnh vào Editor để người dùng kiểm tra
+    // Tự động thêm Tab mới chứa câu lệnh UPDATE
     addTab(updateSql);
 
-    // Hiển thị thông báo hướng dẫn
+    // Hiển thị thông báo
     const msgBox = document.getElementById('msgBox');
-    msgBox.className = 'msg-box success';
-    msgBox.style.display = 'block';
-    msgBox.innerText = `✏️ Đã sinh câu lệnh UPDATE cho cột [${colName.toUpperCase()}]. Hãy kiểm tra lại và bấm "Chạy Query" để thực thi.`;
+    if (msgBox) {
+        msgBox.className = 'msg-box success';
+        msgBox.style.display = 'block';
+        msgBox.innerText = `✏️ Đã sinh câu lệnh UPDATE cho cột [${colName.toUpperCase()}]. Kiểm tra lại và bấm "Chạy" để thực thi.`;
+    }
 }
 
 
