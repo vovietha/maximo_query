@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const queryEngineService = require('./src/services/queryEngineService');
+const schemaService = require('./src/services/schemaService');
 
 const app = express();
 app.use(express.json());
@@ -32,6 +33,24 @@ const handleExecuteSql = async (req, res) => {
 // Đăng ký route khớp cả 2 kiểu gọi từ Frontend
 app.post('/api/execute-sql', handleExecuteSql);
 app.post('/execute-sql', handleExecuteSql);
+
+
+// 2. Endpoint lấy CSDL Schema riêng biệt
+app.post('/api/schema', async (req, res) => {
+    try {
+        const config = {
+            host: req.headers['x-maximo-host'],
+            context: req.headers['x-maximo-context'] || 'maximo',
+            username: req.headers['x-maximo-username'],
+            password: req.headers['x-maximo-password']
+        };
+
+        const schemaMap = await schemaService.getSchema(config);
+        res.json({ success: true, schema: schemaMap });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Maximo SQL Console server running on http://localhost:${PORT}`);
