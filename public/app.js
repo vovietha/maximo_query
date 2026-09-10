@@ -367,7 +367,9 @@ function saveConfig() {
     alert('Đã lưu cấu hình kết nối thành công!');
     closeConfigModal();
     updateStatusBar();
-    loadDynamicSchema();
+    // loadDynamicSchema();
+
+    loadDynamicSchema(true);
 }
 
 function changePage(delta) {
