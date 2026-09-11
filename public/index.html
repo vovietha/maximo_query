@@ -27,7 +27,16 @@
         <div class="nav-brand">
             <h1>MAXIMO SQL QUERY CONSOLE</h1>
         </div>
-        <button class="btn-config" id="btn-config" onclick="openConfigModal()">⚙️ Cấu hình kết nối</button>
+        
+        <!-- Gom 2 nút vào thẻ nav-actions để đẩy sang góc phải -->
+        <div class="nav-actions">
+            <button class="btn-reload-schema" onclick="loadDynamicSchema(true)" title="Tải lại Schema từ CSDL">
+                🔄 Tải lại Schema
+            </button>
+            <button class="btn-config" id="btn-config" onclick="openConfigModal()">
+                ⚙️ Cấu hình kết nối
+            </button>
+        </div>
     </div>
 
     <!-- Main Console Layout -->
