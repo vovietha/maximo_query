@@ -1,6 +1,6 @@
 {
   "name": "maximo_query",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/vovietha/maximo_query.git"
@@ -25,19 +25,19 @@
     "electron": "^44.3.0",
     "electron-builder": "^26.15.3"
   },
-"build": {
-  "appId": "com.maximo.sqlconsole",
-  "productName": "Maximo SQL Query Console",
-  "publish": [
-    {
-      "provider": "github",
-      "owner": "vovietha",
-      "repo": "maximo_query",
-      "releaseType": "release"
+  "build": {
+    "appId": "com.maximo.sqlconsole",
+    "productName": "Maximo SQL Query Console",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "vovietha",
+        "repo": "maximo_query",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": "nsis"
     }
-  ],
-  "win": {
-    "target": "nsis"
   }
-}
 }
