@@ -30,7 +30,7 @@ const handleExecuteSql = async (req, res) => {
     }
 };
 
-// Đăng ký route khớp cả 2 kiểu gọi từ Frontend
+// Đăng ký route 
 app.post('/api/execute-sql', handleExecuteSql);
 app.post('/execute-sql', handleExecuteSql);
 

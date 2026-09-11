@@ -26,7 +26,7 @@ exports.getSchema = async (config = {}) => {
             throw new Error(result.error || 'Không thể lấy dữ liệu CSDL Schema.');
         }
 
-        // Biến đổi mảng phẳng thành Schema Map tại Backend
+        // Biến đổi mảng phẳng thành Schema Map 
         const schemaMap = {};
         result.data.forEach(row => {
             const table = row.tablename;
