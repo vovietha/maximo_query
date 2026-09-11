@@ -8,9 +8,11 @@
     <!-- CodeMirror CSS & Theme -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/eclipse.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/hint/show-hint.min.css">
     <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
+    
 
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
@@ -30,6 +32,7 @@
         
         <!-- Gom 2 nút vào thẻ nav-actions để đẩy sang góc phải -->
         <div class="nav-actions">
+            <button class="btn-theme-toggle" id="btnThemeToggle" onclick="toggleTheme()" title="Đổi giao diện Tối/Sáng">🌙 Tối</button>
             <button class="btn-reload-schema" onclick="loadDynamicSchema(true)" title="Tải lại Schema từ CSDL">
                 🔄 Tải lại Schema
             </button>

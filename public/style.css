@@ -417,3 +417,143 @@ tr:nth-child(even) { background-color: #2a2d2e; }
 .btn-reload-schema:active {
     transform: scale(0.96);
 }
+/* dark/light mode toggle button */
+/* Nút chuyển đổi Theme */
+.btn-theme-toggle {
+    background-color: #252526;
+    color: #e5c07b;
+    border: 1px solid #3c3c3c;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease-in-out;
+}
+.btn-theme-toggle:hover {
+    background-color: #333333;
+    border-color: #e5c07b;
+}
+
+/* =========================================================================
+   LIGHT MODE OVERRIDES (GIAO DIỆN SÁNG)
+   ========================================================================= */
+body.light-mode {
+    background-color: #f4f5f7;
+    color: #172b4d;
+}
+
+/* Header Navbar & Statusbar */
+body.light-mode .navbar,
+body.light-mode .statusbar,
+body.light-mode .results-header,
+body.light-mode .toolbar {
+    background-color: #ffffff;
+    border-color: #dfe1e6;
+    color: #172b4d;
+}
+
+body.light-mode .navbar h1 { color: #0052cc; }
+body.light-mode .btn-config,
+body.light-mode .btn-reload-schema,
+body.light-mode .btn-theme-toggle {
+    background-color: #f4f5f7;
+    color: #172b4d;
+    border-color: #cccccc;
+}
+body.light-mode .btn-config:hover,
+body.light-mode .btn-reload-schema:hover,
+body.light-mode .btn-theme-toggle:hover {
+    background-color: #ebecf0;
+}
+
+/* Sidebar & Result Panels */
+body.light-mode .sidebar,
+body.light-mode .results-panel,
+body.light-mode .editor-container,
+body.light-mode .tab-bar-container {
+    background-color: #ffffff;
+    border-color: #dfe1e6;
+}
+
+body.light-mode .sb-tab {
+    background: #f4f5f7;
+    color: #5e6c84;
+    border-color: #dfe1e6;
+}
+body.light-mode .sb-tab.active {
+    background: #0052cc;
+    color: #ffffff;
+    border-color: #0052cc;
+}
+
+/* Tabs */
+body.light-mode .tab-item {
+    background: #ebecf0;
+    color: #5e6c84;
+    border-color: #dfe1e6;
+}
+body.light-mode .tab-item.active {
+    background: #ffffff;
+    color: #0052cc;
+    border-bottom-color: #0052cc;
+}
+
+/* Controls & Inputs */
+body.light-mode .safe-mode-toggle,
+body.light-mode .auto-limit-box {
+    background-color: #f4f5f7;
+    border-color: #dfe1e6;
+}
+body.light-mode .filter-input,
+body.light-mode .auto-limit-input {
+    background-color: #ffffff;
+    border-color: #cccccc;
+    color: #172b4d;
+}
+
+/* Table Results */
+body.light-mode table th {
+    background-color: #f4f5f7;
+    color: #0052cc;
+    border-color: #dfe1e6;
+}
+body.light-mode table td {
+    border-color: #dfe1e6;
+    color: #172b4d;
+}
+body.light-mode tr:nth-child(even) {
+    background-color: #fafbfc;
+}
+body.light-mode .stt-col {
+    color: #0052cc;
+}
+
+/* Sidebar Items & Modal */
+body.light-mode .history-item,
+body.light-mode .fav-item {
+    background-color: #f4f5f7;
+    border-color: #dfe1e6;
+    color: #172b4d;
+}
+body.light-mode .modal-content {
+    background-color: #ffffff;
+    border-color: #cccccc;
+    color: #172b4d;
+}
+body.light-mode .modal-content input {
+    background-color: #f4f5f7;
+    border-color: #cccccc;
+    color: #172b4d;
+}
+body.light-mode .pagination-widget {
+    background-color: #f4f5f7;
+    border-color: #cccccc;
+}
+body.light-mode .pg-label {
+    color: #0052cc;
+    border-color: #dfe1e6;
+}
