@@ -25,6 +25,9 @@ npm install --save-dev electron electron-builder
 
     #built to github: npx electron-builder --publish always
 
+#auto release github with action
+npm version patch
+git push --follow-tags
 
 ```python
 from psdi.server import MXServer
