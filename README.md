@@ -10,14 +10,10 @@ Script Name: EXEC_SQL
 
 Script Language: jython
 
-built app dev
-```bash
-npm run desktop
-`
-built app
-```bash
-npm run dist
-`
+#built app dev: npm run desktop
+
+#built app: npm run dist
+
 
 ```python
 from psdi.server import MXServer
