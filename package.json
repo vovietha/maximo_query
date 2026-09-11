@@ -1,6 +1,6 @@
 {
   "name": "maximo_query",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Maximo SQL-like Query Engine via OSLC",
   "main": "main.js",
   "scripts": {
@@ -26,6 +26,15 @@
     },
     "win": {
       "target": "nsis"
-    }
+    },
+    "asar": true,
+    "files": [
+      "server.js",
+      "main.js",
+      "src/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "package.json"
+  ]
   }
 }

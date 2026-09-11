@@ -52,6 +52,14 @@ app.post('/api/schema', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Maximo SQL Console server running on http://localhost:${PORT}`);
+}).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.log(`Cổng ${PORT} đã được mở sẵn. Tái sử dụng server hiện tại.`);
+    } else {
+        console.error('Lỗi khởi chạy server:', err);
+    }
 });
+
+module.exports = server;
