@@ -1,10 +1,58 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
 const path = require('path');
 
-// Khởi chạy Express Server ngầm và lưu tham chiếu instance
+// Cấu hình ghi log cho autoUpdater
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+
+// Khởi chạy Express Server ngầm
 const expressServer = require('./server.js');
 
 let mainWindow;
+
+function checkAutoUpdate() {
+    if (!app.isPackaged) return;
+
+    autoUpdater.on('checking-for-update', () => {
+        log.info('Đang kiểm tra bản mới...');
+    });
+
+    autoUpdater.on('update-available', (info) => {
+        log.info(`Tìm thấy phiên bản mới v${info.version}`);
+    });
+
+    // --- CHÈN VÀO ĐÂY ---
+    autoUpdater.on('download-progress', (progressObj) => {
+        let log_message = `Đang tải: ${progressObj.percent.toFixed(1)}%`;
+        log_message += ` (${(progressObj.transferred / 1024 / 1024).toFixed(1)}MB / ${(progressObj.total / 1024 / 1024).toFixed(1)}MB)`;
+        log.info(log_message);
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+        log.info('Ứng dụng đang ở phiên bản mới nhất.');
+    });
+
+    autoUpdater.on('error', (err) => {
+        log.error('Lỗi Auto-Update:', err);
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Cập nhật sẵn sàng',
+            message: `Đã tải xong phiên bản v${info.version}. Khởi động lại ứng dụng để nâng cấp ngay?`,
+            buttons: ['Cập nhật ngay', 'Để sau']
+        }).then((result) => {
+            if (result.response === 0) {
+                autoUpdater.quitAndInstall();
+            }
+        });
+    });
+
+    autoUpdater.checkForUpdates();
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -13,20 +61,19 @@ function createWindow() {
         title: "Maximo SQL Query Console",
         icon: path.join(__dirname, 'public/favicon.ico'),
         autoHideMenuBar: true,
-        show: false, // Ẩn cửa sổ ban đầu để tránh chớp màn hình trắng
-        backgroundColor: '#1e1e1e', // Phủ nền tối theo chuẩn Dark Mode
+        show: false,
+        backgroundColor: '#1e1e1e',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
         }
     });
 
-    // Tải ứng dụng từ Express Server local
     mainWindow.loadURL('http://localhost:3000');
 
-    // Chỉ hiển thị cửa sổ khi giao diện đã nạp hoàn tất
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+        checkAutoUpdate();
     });
 
     mainWindow.on('closed', () => {
@@ -36,7 +83,6 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-// Tự động đóng Express Server và giải phóng cổng 3000 khi thoát app
 app.on('will-quit', () => {
     if (expressServer && typeof expressServer.close === 'function') {
         expressServer.close();

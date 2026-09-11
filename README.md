@@ -10,9 +10,20 @@ Script Name: EXEC_SQL
 
 Script Language: jython
 
+#cài đặt electron vào dự án
+npm install --save-dev electron electron-builder
+
+
 #built app dev: npm run desktop
 
 #built app: npm run dist
+
+#autoupdate:
+    npm install electron-updater
+
+    set GH_TOKEN=token github
+
+    #built to github: npx electron-builder --publish always
 
 
 ```python
