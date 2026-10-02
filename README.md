@@ -11,12 +11,14 @@ Script Name: EXEC_SQL
 Script Language: jython
 
 #cài đặt electron vào dự án
-npm install --save-dev electron electron-builder
+    npm install --save-dev electron electron-builder
 
 
-#built app dev: npm run desktop
+#built app dev: 
+    npm run desktop
 
-#built app: npm run dist
+#built app: 
+    npm run dist
 
 #autoupdate:
 
@@ -31,6 +33,8 @@ npm install --save-dev electron electron-builder
     npm version patch
 
     git push --follow-tags
+
+#AUTO SCRIPT MAXIMO: EXEC_SQL   
 
 ```python
 from psdi.server import MXServer
