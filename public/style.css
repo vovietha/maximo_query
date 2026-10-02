@@ -557,3 +557,130 @@ body.light-mode .pg-label {
     color: #0052cc;
     border-color: #dfe1e6;
 }
+
+/* =========================================================================
+   FIND & REPLACE BAR (DATAGRIP STYLE)
+   ========================================================================= */
+.editor-container {
+    position: relative; /* Bắt buộc để thanh Search nổi lên trên Editor */
+}
+
+.search-replace-bar {
+    position: absolute;
+    top: 4px;
+    right: 12px;
+    z-index: 100;
+    background: #252526;
+    border: 1px solid #007acc;
+    border-radius: 6px;
+    padding: 6px 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+.srb-row { display: flex; align-items: center; gap: 8px; }
+
+.srb-btn-toggle-replace {
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.srb-btn-toggle-replace:hover { background: #3c3c3c; color: #fff; }
+
+.srb-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    padding: 2px 8px;
+    gap: 6px;
+}
+.srb-input-wrapper:focus-within { border-color: #007acc; }
+
+.srb-input-wrapper input {
+    background: transparent;
+    border: none;
+    color: #d4d4d4;
+    font-size: 12px;
+    outline: none;
+    width: 240px;
+    font-family: Consolas, monospace;
+}
+
+.srb-icon { font-size: 11px; opacity: 0.6; }
+
+.srb-options { display: flex; gap: 2px; }
+
+.srb-opt-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: Consolas, monospace;
+}
+.srb-opt-btn:hover { color: #ccc; background: #333; }
+.srb-opt-btn.active { color: #fff; background: #0e639c; }
+
+.srb-count {
+    font-size: 11px;
+    color: #9cdcfe;
+    font-family: Consolas, monospace;
+    min-width: 75px;
+    text-align: center;
+}
+
+.srb-nav-btns, .srb-action-btns { display: flex; gap: 4px; }
+
+.srb-btn {
+    background: #333;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+.srb-btn:hover { background: #04395e; color: #fff; border-color: #007acc; }
+
+.srb-close-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.srb-close-btn:hover { color: #f88080; }
+
+/* Highlight màu cho từ tìm thấy trong CodeMirror */
+.cm-search-highlight {
+    background: rgba(255, 200, 0, 0.25) !important;
+    border-bottom: 1px solid #ffca28;
+}
+.cm-search-highlight-active {
+    background: rgba(255, 110, 0, 0.65) !important;
+    outline: 1px solid #ff9800;
+}
+
+/* Override Light Mode */
+body.light-mode .search-replace-bar {
+    background: #ffffff;
+    border-color: #0052cc;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+body.light-mode .srb-input-wrapper { background: #f4f5f7; border-color: #cccccc; }
+body.light-mode .srb-input-wrapper input { color: #172b4d; }
+body.light-mode .srb-btn { background: #ebecf0; color: #172b4d; border-color: #cccccc; }

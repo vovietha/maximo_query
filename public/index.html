@@ -51,8 +51,40 @@
                 <button class="btn-add-tab" onclick="addTab()" title="Mở Tab Mới">+</button>
             </div>
 
-            <!-- SQL Editor -->
+            <!-- SQL Editor Container -->
             <div class="editor-container">
+                <!-- Thanh Find & Replace chuẩn DataGrip -->
+                <div id="searchReplaceBar" class="search-replace-bar" style="display: none;">
+                    <div class="srb-row srb-search-row">
+                        <button class="srb-btn-toggle-replace" id="btnToggleReplace" onclick="toggleReplaceRow()" title="Hiện/Ẩn thanh Thay thế (Replace)">▼</button>
+                        <div class="srb-input-wrapper">
+                            <span class="srb-icon">🔍</span>
+                            <input type="text" id="findInput" placeholder="Search" oninput="performSearch()" />
+                            <div class="srb-options">
+                                <button class="srb-opt-btn" id="optMatchCase" onclick="toggleSearchOption('case')" title="Match Case (Cc)">Cc</button>
+                                <button class="srb-opt-btn" id="optWholeWord" onclick="toggleSearchOption('word')" title="Words (W)">W</button>
+                                <button class="srb-opt-btn" id="optRegex" onclick="toggleSearchOption('regex')" title="Regex (.*)">.*</button>
+                            </div>
+                        </div>
+                        <span class="srb-count" id="searchCount">0 results</span>
+                        <div class="srb-nav-btns">
+                            <button class="srb-btn" onclick="findPrev()" title="Kết quả trước (Shift+Enter)">↑</button>
+                            <button class="srb-btn" onclick="findNext()" title="Kết quả tiếp (Enter)">↓</button>
+                        </div>
+                        <button class="srb-close-btn" onclick="closeSearchBar()" title="Đóng (Esc)">&times;</button>
+                    </div>
+                    <div class="srb-row srb-replace-row" id="replaceRow" style="display: none;">
+                        <div class="srb-input-wrapper">
+                            <span class="srb-icon">✏️</span>
+                            <input type="text" id="replaceInput" placeholder="Replace" />
+                        </div>
+                        <div class="srb-action-btns">
+                            <button class="srb-btn srb-btn-action" onclick="doReplace()">Replace</button>
+                            <button class="srb-btn srb-btn-action" onclick="doReplaceAll()">Replace All</button>
+                        </div>
+                    </div>
+                </div>
+
                 <textarea id="sqlEditor"></textarea>
             </div>
             

@@ -26,9 +26,22 @@ document.addEventListener('DOMContentLoaded', () => {
         indentWithTabs: true,
         smartIndent: true,
         lineWrapping: true,
+        // extraKeys: {
+        //     "Ctrl-Space": "autocomplete",
+        //     "Ctrl-Enter": () => { runQuery(1); },
+        //     "Ctrl-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); },
+        //     "Cmd-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); }
+        // },
         extraKeys: {
             "Ctrl-Space": "autocomplete",
             "Ctrl-Enter": () => { runQuery(1); },
+            "Ctrl-F": () => { showSearchBar(false); },
+            "Cmd-F": () => { showSearchBar(false); },
+            "Ctrl-R": () => { showSearchBar(true); },
+            "Cmd-R": () => { showSearchBar(true); },
+            "Ctrl-H": () => { showSearchBar(true); },
+            "Cmd-H": () => { showSearchBar(true); },
+            "Esc": () => { closeSearchBar(); },
             "Ctrl-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); },
             "Cmd-/": (cm) => { cm.toggleComment({ lineComment: "-- " }); }
         },
@@ -1106,3 +1119,217 @@ function updateStatusBar() {
 }
 
 
+// =========================================================================
+// DATAGRIP-LIKE FIND & REPLACE ENGINE
+// =========================================================================
+let searchState = {
+    caseSensitive: false,
+    wholeWord: false,
+    regex: false,
+    matches: [],
+    currentIndex: -1,
+    markers: []
+};
+
+// Đăng ký sự kiện Enter / Esc cho ô Input Search & Replace
+document.addEventListener('DOMContentLoaded', () => {
+    const findInput = document.getElementById('findInput');
+    const replaceInput = document.getElementById('replaceInput');
+
+    if (findInput) {
+        findInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (e.shiftKey) findPrev();
+                else findNext();
+            } else if (e.key === 'Escape') {
+                closeSearchBar();
+            }
+        });
+    }
+
+    if (replaceInput) {
+        replaceInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                doReplace();
+            } else if (e.key === 'Escape') {
+                closeSearchBar();
+            }
+        });
+    }
+});
+
+function showSearchBar(showReplace = false) {
+    const bar = document.getElementById('searchReplaceBar');
+    const replaceRow = document.getElementById('replaceRow');
+    const findInput = document.getElementById('findInput');
+
+    if (!bar) return;
+
+    bar.style.display = 'flex';
+    replaceRow.style.display = showReplace ? 'flex' : 'none';
+
+    if (editor) {
+        const selection = editor.getSelection().trim();
+        if (selection && !selection.includes('\n')) {
+            findInput.value = selection;
+        }
+    }
+
+    findInput.focus();
+    findInput.select();
+    performSearch();
+}
+
+function closeSearchBar() {
+    const bar = document.getElementById('searchReplaceBar');
+    if (bar) bar.style.display = 'none';
+    clearSearchHighlights();
+    if (editor) editor.focus();
+}
+
+function toggleReplaceRow() {
+    const replaceRow = document.getElementById('replaceRow');
+    const isHidden = replaceRow.style.display === 'none';
+    replaceRow.style.display = isHidden ? 'flex' : 'none';
+}
+
+function toggleSearchOption(type) {
+    if (type === 'case') {
+        searchState.caseSensitive = !searchState.caseSensitive;
+        document.getElementById('optMatchCase').classList.toggle('active', searchState.caseSensitive);
+    } else if (type === 'word') {
+        searchState.wholeWord = !searchState.wholeWord;
+        document.getElementById('optWholeWord').classList.toggle('active', searchState.wholeWord);
+    } else if (type === 'regex') {
+        searchState.regex = !searchState.regex;
+        document.getElementById('optRegex').classList.toggle('active', searchState.regex);
+    }
+    performSearch();
+}
+
+function clearSearchHighlights() {
+    searchState.markers.forEach(m => m.clear());
+    searchState.markers = [];
+    searchState.matches = [];
+    searchState.currentIndex = -1;
+}
+
+function performSearch() {
+    clearSearchHighlights();
+    const query = document.getElementById('findInput').value;
+    const countLabel = document.getElementById('searchCount');
+
+    if (!query || !editor) {
+        if (countLabel) countLabel.innerText = '0 results';
+        return;
+    }
+
+    const doc = editor.getDoc();
+    const text = doc.getValue();
+    let pattern;
+
+    try {
+        let flags = searchState.caseSensitive ? 'g' : 'gi';
+        let escapedQuery = searchState.regex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (searchState.wholeWord) {
+            escapedQuery = `\\b${escapedQuery}\\b`;
+        }
+        pattern = new RegExp(escapedQuery, flags);
+    } catch (e) {
+        if (countLabel) countLabel.innerText = 'Invalid Regex';
+        return;
+    }
+
+    let match;
+    const matches = [];
+
+    while ((match = pattern.exec(text)) !== null) {
+        if (match[0].length === 0) break;
+        const from = doc.posFromIndex(match.index);
+        const to = doc.posFromIndex(match.index + match[0].length);
+        matches.push({ from, to });
+    }
+
+    searchState.matches = matches;
+
+    if (matches.length > 0) {
+        const cursor = doc.getCursor();
+        const cursorIndex = doc.indexFromPos(cursor);
+        let closestIdx = 0;
+
+        for (let i = 0; i < matches.length; i++) {
+            if (doc.indexFromPos(matches[i].from) >= cursorIndex) {
+                closestIdx = i;
+                break;
+            }
+        }
+        searchState.currentIndex = closestIdx;
+        updateHighlights();
+    } else {
+        if (countLabel) countLabel.innerText = '0 results';
+    }
+}
+
+function updateHighlights() {
+    searchState.markers.forEach(m => m.clear());
+    searchState.markers = [];
+
+    const doc = editor.getDoc();
+    const countLabel = document.getElementById('searchCount');
+    const matches = searchState.matches;
+
+    if (matches.length === 0) {
+        if (countLabel) countLabel.innerText = '0 results';
+        return;
+    }
+
+    matches.forEach((m, idx) => {
+        const isCurrent = idx === searchState.currentIndex;
+        const className = isCurrent ? 'cm-search-highlight cm-search-highlight-active' : 'cm-search-highlight';
+        const marker = doc.markText(m.from, m.to, { className });
+        searchState.markers.push(marker);
+    });
+
+    if (countLabel) {
+        countLabel.innerText = `${searchState.currentIndex + 1} of ${matches.length}`;
+    }
+
+    if (searchState.currentIndex >= 0 && searchState.currentIndex < matches.length) {
+        const currentMatch = matches[searchState.currentIndex];
+        editor.scrollIntoView({ from: currentMatch.from, to: currentMatch.to }, 80);
+    }
+}
+
+function findNext() {
+    if (searchState.matches.length === 0) return;
+    searchState.currentIndex = (searchState.currentIndex + 1) % searchState.matches.length;
+    updateHighlights();
+}
+
+function findPrev() {
+    if (searchState.matches.length === 0) return;
+    searchState.currentIndex = (searchState.currentIndex - 1 + searchState.matches.length) % searchState.matches.length;
+    updateHighlights();
+}
+
+function doReplace() {
+    if (searchState.currentIndex < 0 || searchState.matches.length === 0) return;
+    const replaceText = document.getElementById('replaceInput').value;
+    const match = searchState.matches[searchState.currentIndex];
+
+    editor.replaceRange(replaceText, match.from, match.to);
+    performSearch();
+}
+
+function doReplaceAll() {
+    if (searchState.matches.length === 0) return;
+    const replaceText = document.getElementById('replaceInput').value;
+
+    editor.operation(() => {
+        for (let i = searchState.matches.length - 1; i >= 0; i--) {
+            const m = searchState.matches[i];
+            editor.replaceRange(replaceText, m.from, m.to);
+        }
+    });
+    performSearch();
+}
