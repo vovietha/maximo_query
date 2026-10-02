@@ -11,13 +11,16 @@ Script Name: EXEC_SQL
 Script Language: jython
 
 #cài đặt electron vào dự án
+
     npm install --save-dev electron electron-builder
 
 
-#built app dev: 
+#built app dev:
+
     npm run desktop
 
-#built app: 
+#built app:
+
     npm run dist
 
 #autoupdate:
